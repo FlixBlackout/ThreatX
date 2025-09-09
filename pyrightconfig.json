@@ -1,0 +1,31 @@
+{
+  "include": [
+    ".",
+    "ai-engine",
+    "ai-engine/src",
+    "ai_engine",
+    "ai_engine/src"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/static/js/**",
+    "dashboard/src/main/resources/static/js/**"
+  ],
+  "extraPaths": [
+    "ai-engine/src",
+    "ai-engine",
+    "ai_engine/src",
+    "ai_engine"
+  ],
+  "pythonPath": "python",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "reportUndefinedVariable": "none",
+  "useLibraryCodeForTypes": true,
+  "strictListInference": false,
+  "strictDictionaryInference": false,
+  "strictSetInference": false
+}

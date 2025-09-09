@@ -1,0 +1,32 @@
+[tool.pylsp-mypy]
+enabled = true
+
+[tool.pyright]
+pythonPath = "python"
+include = [".", "ai-engine", "ai-engine/src", "ai_engine", "ai_engine/src"]
+exclude = ["**/__pycache__"]
+extraPaths = ["ai-engine/src", "ai-engine", "ai_engine/src", "ai_engine"]
+typeCheckingMode = "basic"
+reportMissingImports = "warning"
+reportMissingModuleSource = "warning"
+
+[tool.pylance]
+extraPaths = ["ai-engine/src", "ai-engine", "ai_engine/src", "ai_engine"]
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "threatx"
+version = "1.0.0"
+description = "AI-Powered Cybersecurity Threat Detection System"
+requires-python = ">=3.8"
+dependencies = [
+    "flask",
+    "flask-cors", 
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "joblib"
+]

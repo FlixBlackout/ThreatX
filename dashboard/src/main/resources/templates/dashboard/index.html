@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThreatX Security Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link th:href="@{/css/dashboard.css}" rel="stylesheet">
+</head>
+<body class="bg-dark-theme">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient-primary shadow-lg glass-card">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-shield-alt fs-4 me-2"></i>
+                <span class="fw-bold">ThreatX</span>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center active" href="/">
+                            <i class="fas fa-home me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center" href="/monitoring">
+                            <i class="fas fa-eye me-1"></i> Monitoring
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center" href="/threats">
+                            <i class="fas fa-exclamation-triangle me-1"></i> Threats
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center" href="/users">
+                            <i class="fas fa-users me-1"></i> Users
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center" href="/ips">
+                            <i class="fas fa-globe me-1"></i> IP Analysis
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center" href="/settings">
+                            <i class="fas fa-cog me-1"></i> Settings
+                        </a>
+                    </li>
+                </ul>
+                
+                <!-- Status indicators -->
+                <ul class="navbar-nav">
+                    <li class="nav-item me-3">
+                        <div class="d-flex align-items-center">
+                            <div class="status-indicator pulse" th:classappend="${aiEngineOnline ? 'status-online' : 'status-offline'}"></div>
+                            <span class="navbar-text ms-2 small">
+                                AI Engine: <span th:text="${aiEngineOnline ? 'Online' : 'Offline'}">Status</span>
+                            </span>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <span class="navbar-text small" id="currentTimeDisplay">
+                            <!-- Time will be updated by JavaScript -->
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Alert messages -->
+    <div class="container-fluid mt-3" th:if="${alertMessage}">
+        <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle me-2"></i>
+                <span th:text="${alertMessage}">Alert message</span>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Content -->
+    <div class="container-fluid mt-4">
+        <!-- Welcome Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-lg glass-card fade-in">
+                    <div class="card-body py-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                            <div>
+                                <h1 class="mb-2">Security Dashboard</h1>
+                                <p class="mb-0 text-gray-300">Real-time threat monitoring and analysis</p>
+                            </div>
+                            <div class="mt-3 mt-md-0 d-flex gap-2">
+                                <button class="btn btn-outline-primary" id="refreshButton">
+                                    <i class="fas fa-sync-alt me-2"></i>Refresh Data
+                                </button>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                                    <label class="form-check-label small" for="autoRefreshToggle">Auto-refresh</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards Row -->
+        <div class="row mb-4 g-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="card border-left-primary shadow h-100 pop-in glass-card">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col me-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Total Threats (24h)
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalThreats"
+                                     th:text="${threatStats?.total_threats ?: 0}">0</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card border-left-danger shadow h-100 pop-in glass-card">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col me-2">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                    High Risk Alerts
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="highRiskThreats"
+                                     th:text="${threatStats?.threat_counts?.HIGH ?: 0}">0</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-skull-crossbones fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card border-left-warning shadow h-100 pop-in glass-card">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col me-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                    Medium Risk Alerts
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="mediumRiskThreats"
+                                     th:text="${threatStats?.threat_counts?.MEDIUM ?: 0}">0</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card border-left-info shadow h-100 pop-in glass-card">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col me-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                    Suspicious IPs
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="suspiciousIPsCount"
+                                     th:text="${suspiciousIps?.size() ?: 0}">0</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-globe fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-4 mb-4">
+            <!-- Threat Timeline Chart -->
+            <div class="col-xl-8 col-lg-7">
+                <div class="card shadow h-100 glass-card">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Threat Detection Timeline</h6>
+                        <div class="dropdown no-arrow">
+                            <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink"
+                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in">
+                                <div class="dropdown-header">Time Range:</div>
+                                <a class="dropdown-item" href="?range=1h">Last Hour</a>
+                                <a class="dropdown-item" href="?range=24h">Last 24 Hours</a>
+                                <a class="dropdown-item" href="?range=7d">Last 7 Days</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-area">
+                            <canvas id="threatTimelineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Threat Types Pie Chart -->
+            <div class="col-xl-4 col-lg-5">
+                <div class="card shadow h-100 glass-card">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Threat Types Distribution</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-pie pt-4 pb-2">
+                            <canvas id="threatTypesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Threats and Suspicious IPs Row -->
+        <div class="row g-4 mb-4">
+            <!-- Recent Threats -->
+            <div class="col-lg-6">
+                <div class="card shadow h-100 glass-card">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Recent High-Risk Threats</h6>
+                        <a href="/threats" class="btn btn-sm btn-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>View All
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="recentThreatsTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Risk Level</th>
+                                        <th>IP Address</th>
+                                        <th>Threat Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:if="${suspiciousIps != null and not #lists.isEmpty(suspiciousIps)}" 
+                                        th:each="ip : ${suspiciousIps}">
+                                        <td class="timestamp" th:text="${#dates.format(ip.last_seen, 'HH:mm:ss')}">14:30:00</td>
+                                        <td>
+                                            <span class="badge bg-danger" th:if="${ip.threat_count > 5}">HIGH</span>
+                                            <span class="badge bg-warning" th:unless="${ip.threat_count > 5}">MEDIUM</span>
+                                        </td>
+                                        <td class="ip-address" th:text="${ip.ip_address}">192.168.1.1</td>
+                                        <td>
+                                            <span class="threat-tag" th:text="${ip.country_code ?: 'Unknown'}">US</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${suspiciousIps == null or #lists.isEmpty(suspiciousIps)}">
+                                        <td colspan="4" class="text-center text-muted">No recent threats detected</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suspicious IPs -->
+            <div class="col-lg-6">
+                <div class="card shadow h-100 glass-card">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Top Suspicious IP Addresses</h6>
+                        <a href="/ips" class="btn btn-sm btn-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>View All
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="suspiciousIpsTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>Threat Count</th>
+                                        <th>Country</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:if="${suspiciousIps != null and not #lists.isEmpty(suspiciousIps)}" 
+                                        th:each="ip : ${suspiciousIps}">
+                                        <td class="ip-address" th:text="${ip.ip_address}">192.168.1.1</td>
+                                        <td th:text="${ip.threat_count}">5</td>
+                                        <td th:text="${ip.country_code ?: 'Unknown'}">US</td>
+                                        <td>
+                                            <span class="badge bg-warning" th:if="${ip.is_blocked}">Blocked</span>
+                                            <span class="badge bg-danger" th:unless="${ip.is_blocked}">Active</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${suspiciousIps == null or #lists.isEmpty(suspiciousIps)}">
+                                        <td colspan="4" class="text-center text-muted">No suspicious IPs detected</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow glass-card">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <button class="btn btn-outline-primary btn-block quick-actions" onclick="testThreatDetection()">
+                                    <i class="fas fa-vial me-2"></i> Test Detection
+                                </button>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="/monitoring" class="btn btn-outline-info btn-block quick-actions">
+                                    <i class="fas fa-eye me-2"></i> Live Monitoring
+                                </a>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="/export/threats?format=csv" class="btn btn-outline-success btn-block quick-actions">
+                                    <i class="fas fa-download me-2"></i> Export Report
+                                </a>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="/settings" class="btn btn-outline-secondary btn-block quick-actions">
+                                    <i class="fas fa-cog me-2"></i> Configure
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Detection Modal -->
+    <div class="modal fade" id="testDetectionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content glass-card">
+                <div class="modal-header">
+                    <h5 class="modal-title">Test Threat Detection</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="testDetectionForm">
+                        <div class="mb-3">
+                            <label for="testIpAddress" class="form-label">IP Address</label>
+                            <input type="text" class="form-control glass-card" id="testIpAddress" value="192.168.1.100">
+                        </div>
+                        <div class="mb-3">
+                            <label for="testUserId" class="form-label">User ID</label>
+                            <input type="text" class="form-control glass-card" id="testUserId" value="test_user">
+                        </div>
+                        <div class="mb-3">
+                            <label for="testFailedLogins" class="form-label">Failed Login Attempts</label>
+                            <input type="number" class="form-control glass-card" id="testFailedLogins" value="0">
+                        </div>
+                        <div class="mb-3">
+                            <label for="testEventType" class="form-label">Event Type</label>
+                            <select class="form-control glass-card" id="testEventType">
+                                <option value="login">Login</option>
+                                <option value="failed_login">Failed Login</option>
+                                <option value="data_access">Data Access</option>
+                                <option value="file_download">File Download</option>
+                            </select>
+                        </div>
+                    </form>
+                    <div id="testResult" class="mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="runThreatDetectionTest()">Run Test</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Footer -->
+    <footer class="bg-dark-secondary text-light mt-5 py-4 border-top border-dark glass-card">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="fw-bold"><i class="fas fa-shield-alt me-2"></i>ThreatX Security Dashboard</h5>
+                    <p class="mb-0 text-gray-300">AI-Powered Cybersecurity Threat Detection System</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">© 2024 ThreatX. All rights reserved.</p>
+                    <small class="text-muted">Version 1.2.0</small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script th:src="@{/js/dashboard.js}"></script>
+    
+    <script th:inline="javascript">
+        // Initialize charts with data from Thymeleaf
+        const threatStats = /*[[${threatStats}]]*/ {};
+        
+        // Threat Timeline Chart
+        const timelineCtx = document.getElementById('threatTimelineChart').getContext('2d');
+        const timelineChart = new Chart(timelineCtx, {
+            type: 'line',
+            data: {
+                labels: [], // Will be populated from threatStats.timeline_data
+                datasets: [{
+                    label: 'High Risk',
+                    data: [],
+                    borderColor: '#ef476f',
+                    backgroundColor: 'rgba(239, 71, 111, 0.1)',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    fill: true
+                }, {
+                    label: 'Medium Risk',
+                    data: [],
+                    borderColor: '#ffd166',
+                    backgroundColor: 'rgba(255, 209, 102, 0.1)',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    fill: true
+                }, {
+                    label: 'Low Risk',
+                    data: [],
+                    borderColor: '#1b9aaa',
+                    backgroundColor: 'rgba(27, 154, 170, 0.1)',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#e2e8f0',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Threat Detection Over Time',
+                        color: '#e2e8f0',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#94a3b8'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#94a3b8'
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            }
+        });
+
+        // Threat Types Pie Chart
+        const typesCtx = document.getElementById('threatTypesChart').getContext('2d');
+        const typesChart = new Chart(typesCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Brute Force', 'Malicious IP', 'Data Exfiltration', 'Geographic Anomaly', 'Other'],
+                datasets: [{
+                    data: [30, 25, 20, 15, 10],
+                    backgroundColor: [
+                        '#ef476f',
+                        '#ffd166',
+                        '#1b9aaa',
+                        '#06d6a0',
+                        '#6c757d'
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 15
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#e2e8f0',
+                            font: {
+                                size: 11
+                            },
+                            padding: 15
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+
+        // Test threat detection function
+        function testThreatDetection() {
+            const modal = new bootstrap.Modal(document.getElementById('testDetectionModal'));
+            modal.show();
+        }
+
+        function runThreatDetectionTest() {
+            const testData = {
+                ip_address: document.getElementById('testIpAddress').value,
+                user_id: document.getElementById('testUserId').value,
+                failed_login_attempts: parseInt(document.getElementById('testFailedLogins').value),
+                total_login_attempts: parseInt(document.getElementById('testFailedLogins').value) + 1,
+                event_type: document.getElementById('testEventType').value,
+                bytes_transferred: 1024
+            };
+
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.innerHTML = '<div class="text-center"><div class="loading-spinner"></div> <span class="ms-2">Analyzing threat...</span></div>';
+
+            fetch('/test-detection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(testData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
+                } else {
+                    const riskBadge = data.risk_level === 'HIGH' ? 'danger' : 
+                                     data.risk_level === 'MEDIUM' ? 'warning' : 
+                                     data.risk_level === 'LOW' ? 'info' : 'success';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success glass-card">
+                            <h6 class="mb-3"><i class="fas fa-check-circle me-2"></i>Detection Result</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Risk Score:</strong> ${data.risk_score}</p>
+                                    <p class="mb-1"><strong>Risk Level:</strong> <span class="badge bg-${riskBadge}">${data.risk_level}</span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Confidence:</strong> ${(data.confidence * 100).toFixed(1)}%</p>
+                                    <p class="mb-1"><strong>Threat Types:</strong> ${data.threat_types ? data.threat_types.join(', ') : 'None'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = 
+                    `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ${error.message}</div>`;
+            });
+        }
+
+        // Refresh dashboard function
+        function refreshDashboard() {
+            location.reload();
+        }
+
+        // Update current time display
+        function updateCurrentTime() {
+            const now = new Date();
+            document.getElementById('currentTimeDisplay').textContent = now.toLocaleString();
+        }
+
+        // Initialize time display and update every second
+        updateCurrentTime();
+        setInterval(updateCurrentTime, 1000);
+
+        // Auto-refresh dashboard data every 30 seconds
+        let refreshInterval = setInterval(function() {
+            // Add visual indication of refresh
+            const refreshBtn = document.getElementById('refreshButton');
+            const originalHTML = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<i class="fas fa-sync fa-spin me-2"></i>Refreshing...';
+            
+            setTimeout(() => {
+                refreshBtn.innerHTML = originalHTML;
+            }, 1000);
+        }, 30000);
+
+        // Handle auto-refresh toggle
+        document.getElementById('autoRefreshToggle').addEventListener('change', function() {
+            if (this.checked) {
+                refreshInterval = setInterval(function() {
+                    const refreshBtn = document.getElementById('refreshButton');
+                    const originalHTML = refreshBtn.innerHTML;
+                    refreshBtn.innerHTML = '<i class="fas fa-sync fa-spin me-2"></i>Refreshing...';
+                    
+                    setTimeout(() => {
+                        refreshBtn.innerHTML = originalHTML;
+                    }, 1000);
+                }, 30000);
+            } else {
+                clearInterval(refreshInterval);
+            }
+        });
+
+        // Handle refresh button click
+        document.getElementById('refreshButton').addEventListener('click', function() {
+            const originalHTML = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-sync fa-spin me-2"></i>Refreshing...';
+            
+            setTimeout(() => {
+                this.innerHTML = originalHTML;
+                location.reload();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

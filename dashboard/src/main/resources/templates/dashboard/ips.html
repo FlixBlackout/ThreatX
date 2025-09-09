@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::content})}">
+<head>
+    <title>IP Analysis - ThreatX Dashboard</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <!-- Alert messages -->
+        <div class="container-fluid mt-3" th:if="${alertMessage}">
+            <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span th:text="${alertMessage}">Alert message</span>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="container-fluid mt-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+                <div>
+                    <h1 class="mb-2"><i class="fas fa-globe me-2 text-info"></i>IP Analysis & Threat Intelligence</h1>
+                    <p class="mb-0 text-gray-300">Monitor and analyze suspicious IP addresses</p>
+                </div>
+                <div class="mt-3 mt-md-0">
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary" onclick="refreshIPData()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                        <button type="button" class="btn btn-outline-success" onclick="exportIPData()">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                        <button type="button" class="btn btn-outline-info" onclick="showIPMap()">
+                            <i class="fas fa-map me-1"></i>Map View
+                        </button>
+                        <span class="badge bg-success pulse glass-card" th:classappend="${aiEngineOnline ? 'bg-success' : 'bg-danger'}">
+                            <i class="fas fa-robot me-1"></i>AI Engine: <span th:text="${aiEngineOnline ? 'Online' : 'Offline'}">Status</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IP Statistics Row -->
+            <div class="row mb-4 g-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-danger shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                        Blocked IPs
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="blockedIPsCount" 
+                                         th:text="${suspiciousIps != null ? suspiciousIps.size() : 0}">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-ban fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-warning shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                        Watchlist IPs
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="watchlistIPsCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-eye fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-info shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                        Unique Countries
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="uniqueCountriesCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-flag fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-success shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                        Whitelisted IPs
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="whitelistedIPsCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-shield-alt fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row mb-4 g-4">
+                <!-- Geographic Distribution -->
+                <div class="col-xl-6 col-lg-6">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Geographic Distribution</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary active" onclick="setGeoTimeRange('24h')">24H</button>
+                                <button class="btn btn-outline-primary" onclick="setGeoTimeRange('7d')">7D</button>
+                                <button class="btn btn-outline-primary" onclick="setGeoTimeRange('30d')">30D</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-pie pt-4 pb-2">
+                                <canvas id="geoDistributionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Threat Activity Timeline -->
+                <div class="col-xl-6 col-lg-6">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">IP Threat Activity (24h)</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="setActivityTimeRange('1h')">1H</button>
+                                <button class="btn btn-outline-primary active" onclick="setActivityTimeRange('24h')">24H</button>
+                                <button class="btn btn-outline-primary" onclick="setActivityTimeRange('7d')">7D</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-area">
+                                <canvas id="ipActivityChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced IP Analysis Tools -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">IP Lookup Tool</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-group mb-3">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" placeholder="Enter IP address..." id="ipLookupInput">
+                                <button class="btn btn-primary" type="button" onclick="lookupIP()">
+                                    <i class="fas fa-search me-1"></i>Analyze IP
+                                </button>
+                            </div>
+                            <div id="ipLookupResult"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Advanced IP Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-outline-danger" onclick="bulkBlock()">
+                                    <i class="fas fa-ban me-2"></i>Block Selected IPs
+                                </button>
+                                <button class="btn btn-outline-warning" onclick="bulkAddToWatchlist()">
+                                    <i class="fas fa-eye me-2"></i>Add to Watchlist
+                                </button>
+                                <button class="btn btn-outline-success" onclick="bulkWhitelist()">
+                                    <i class="fas fa-shield-alt me-2"></i>Add to Whitelist
+                                </button>
+                                <button class="btn btn-outline-info" onclick="bulkExport()">
+                                    <i class="fas fa-file-export me-2"></i>Export Selected IPs
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced IP Search and Filter -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Advanced IP Search & Filter</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label for="ipSearch" class="form-label">IP Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                        <input type="text" class="form-control" placeholder="Search IPs..." id="ipSearch">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="countryFilter" class="form-label">Country</label>
+                                    <select class="form-control" id="countryFilter">
+                                        <option value="">All Countries</option>
+                                        <option value="US">United States</option>
+                                        <option value="CN">China</option>
+                                        <option value="RU">Russia</option>
+                                        <option value="DE">Germany</option>
+                                        <option value="BR">Brazil</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="riskFilter" class="form-label">Risk Level</label>
+                                    <select class="form-control" id="riskFilter">
+                                        <option value="">All Risk Levels</option>
+                                        <option value="high">High Risk</option>
+                                        <option value="medium">Medium Risk</option>
+                                        <option value="low">Low Risk</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="statusFilter" class="form-label">Status</label>
+                                    <select class="form-control" id="statusFilter">
+                                        <option value="">All Statuses</option>
+                                        <option value="blocked">Blocked</option>
+                                        <option value="active">Active</option>
+                                        <option value="watchlist">Watchlist</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12 d-flex justify-content-end">
+                                    <button class="btn btn-outline-secondary me-2" onclick="resetFilters()">
+                                        <i class="fas fa-redo me-1"></i>Reset
+                                    </button>
+                                    <button class="btn btn-primary" onclick="applyFilters()">
+                                        <i class="fas fa-filter me-1"></i>Apply Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suspicious IPs Table -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Suspicious IP Addresses</h6>
+                            <div class="dropdown no-arrow">
+                                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink"
+                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end shadow animated--fade-in">
+                                    <div class="dropdown-header">Filter by Status:</div>
+                                    <a class="dropdown-item" href="?status=blocked">Blocked IPs</a>
+                                    <a class="dropdown-item" href="?status=watchlist">Watchlist</a>
+                                    <a class="dropdown-item" href="?status=active">Active Threats</a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="?">All IPs</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="ipsTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>
+                                                <div class="form-check">
+                                                    <input type="checkbox" id="selectAllIPs" class="form-check-input" onchange="toggleSelectAllIPs()">
+                                                    <label class="form-check-label"></label>
+                                                </div>
+                                            </th>
+                                            <th>IP Address</th>
+                                            <th>Country</th>
+                                            <th>Threat Count</th>
+                                            <th>Risk Score</th>
+                                            <th>First Seen</th>
+                                            <th>Last Activity</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ipsTableBody">
+                                        <tr th:if="${suspiciousIps != null and not #lists.isEmpty(suspiciousIps)}" 
+                                            th:each="ip : ${suspiciousIps}">
+                                            <td>
+                                                <div class="form-check">
+                                                    <input type="checkbox" th:value="${ip.ip_address}" class="form-check-input ip-checkbox">
+                                                </div>
+                                            </td>
+                                            <td class="ip-address" th:text="${ip.ip_address}">192.168.1.1</td>
+                                            <td th:text="${ip.country_code ?: 'Unknown'}">US</td>
+                                            <td th:text="${ip.threat_count}">5</td>
+                                            <td th:text="${ip.risk_score ?: '0.5'}">0.75</td>
+                                            <td th:text="${ip.first_seen ?: 'Unknown'}">2024-01-15 10:30</td>
+                                            <td th:text="${ip.last_activity ?: 'Unknown'}">2024-01-15 14:30</td>
+                                            <td>
+                                                <span class="badge bg-warning" th:if="${ip.is_blocked}">Blocked</span>
+                                                <span class="badge bg-danger" th:unless="${ip.is_blocked}">Active</span>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary" th:onclick="'showIPDetails(\'' + ${ip.ip_address} + '\')'">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" th:onclick="'blockIP(\'' + ${ip.ip_address} + '\')'">
+                                                    <i class="fas fa-ban"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr th:if="${suspiciousIps == null or #lists.isEmpty(suspiciousIps)}">
+                                            <td colspan="9" class="text-center text-muted">Loading IP data...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IP Details Modal -->
+        <div class="modal fade" id="ipDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content glass-card">
+                    <div class="modal-header">
+                        <h5 class="modal-title">IP Address Details</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="ipDetailsContent">
+                        <!-- IP details will be loaded here -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-warning" onclick="addToWatchlist()">Add to Watchlist</button>
+                        <button type="button" class="btn btn-danger" onclick="blockCurrentIP()">Block IP</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IP Map Modal -->
+        <div class="modal fade" id="ipMapModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content glass-card">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Global Threat Map</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="threatMap" class="geo-map-container">
+                            <div class="d-flex align-items-center justify-content-center h-100">
+                                <div class="text-center">
+                                    <i class="fas fa-globe-americas fa-3x text-primary mb-3"></i>
+                                    <h5>Global Threat Visualization</h5>
+                                    <p class="text-muted mb-0">Real-time visualization of threat sources worldwide</p>
+                                    <div class="mt-3">
+                                        <div class="d-inline-block me-3">
+                                            <i class="fas fa-circle text-danger me-1"></i> High Risk
+                                        </div>
+                                        <div class="d-inline-block me-3">
+                                            <i class="fas fa-circle text-warning me-1"></i> Medium Risk
+                                        </div>
+                                        <div class="d-inline-block">
+                                            <i class="fas fa-circle text-info me-1"></i> Low Risk
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="refreshMap()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh Map
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let selectedIPs = [];
+            let currentIP = '';
+            let ipData = [];
+
+            document.addEventListener('DOMContentLoaded', function() {
+                initializeCharts();
+                loadIPData();
+                updateIPStats();
+                
+                // Add search on Enter key
+                document.getElementById('ipSearch').addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyFilters();
+                    }
+                });
+                
+                // Add event listeners for advanced filters
+                document.getElementById('countryFilter').addEventListener('change', function() {
+                    applyFilters();
+                });
+                
+                document.getElementById('riskFilter').addEventListener('change', function() {
+                    applyFilters();
+                });
+                
+                document.getElementById('statusFilter').addEventListener('change', function() {
+                    applyFilters();
+                });
+            });
+
+            function initializeCharts() {
+                // Geographic Distribution Chart
+                const geoCtx = document.getElementById('geoDistributionChart').getContext('2d');
+                new Chart(geoCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['United States', 'China', 'Russia', 'Germany', 'Brazil', 'Other'],
+                        datasets: [{
+                            data: [25, 20, 15, 10, 8, 22],
+                            backgroundColor: [
+                                '#ef476f',
+                                '#ffd166',
+                                '#1b9aaa',
+                                '#06d6a0',
+                                '#9b5de5',
+                                '#6c757d'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 15
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: {
+                                        size: 11
+                                    },
+                                    padding: 15
+                                }
+                            }
+                        },
+                        cutout: '60%',
+                        animation: {
+                            animateRotate: true,
+                            animateScale: true,
+                            duration: 1000
+                        }
+                    }
+                });
+
+                // IP Activity Chart
+                const activityCtx = document.getElementById('ipActivityChart').getContext('2d');
+                new Chart(activityCtx, {
+                    type: 'line',
+                    data: {
+                        labels: generateTimeLabels(),
+                        datasets: [{
+                            label: 'New Suspicious IPs',
+                            data: generateRandomData(24, 0, 10),
+                            borderColor: '#ef476f',
+                            backgroundColor: 'rgba(239, 71, 111, 0.1)',
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#ef476f',
+                            fill: true
+                        }, {
+                            label: 'Blocked IPs',
+                            data: generateRandomData(24, 0, 5),
+                            borderColor: '#ffd166',
+                            backgroundColor: 'rgba(255, 209, 102, 0.1)',
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#ffd166',
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#e2e8f0'
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeOutQuart'
+                        }
+                    }
+                });
+            }
+
+            function generateTimeLabels() {
+                const labels = [];
+                for (let i = 23; i >= 0; i--) {
+                    const date = new Date();
+                    date.setHours(date.getHours() - i);
+                    labels.push(date.getHours() + ':00');
+                }
+                return labels;
+            }
+
+            function generateRandomData(count, min, max) {
+                const data = [];
+                for (let i = 0; i < count; i++) {
+                    data.push(Math.floor(Math.random() * (max - min + 1)) + min);
+                }
+                return data;
+            }
+
+            function loadIPData() {
+                // If no data from server, generate sample data
+                const tableBody = document.getElementById('ipsTableBody');
+                if (tableBody.querySelector('td[colspan="9"]')) {
+                    ipData = generateSampleIPs();
+                    renderIPsTable(ipData);
+                }
+            }
+
+            function generateSampleIPs() {
+                const ips = [];
+                const sampleIPs = ['192.168.1.100', '10.0.0.50', '203.0.113.45', '198.51.100.30', '185.220.101.5', 
+                                  '172.16.0.100', '203.0.113.199', '198.51.100.150', '185.220.101.200'];
+                const countries = ['US', 'CN', 'RU', 'DE', 'BR', 'FR', 'GB', 'JP', 'IN'];
+                const statuses = ['Blocked', 'Active', 'Watchlist'];
+
+                sampleIPs.forEach((ip, index) => {
+                    const firstSeen = new Date();
+                    firstSeen.setHours(firstSeen.getHours() - Math.random() * 168); // Within last week
+                    
+                    const lastActivity = new Date();
+                    lastActivity.setMinutes(lastActivity.getMinutes() - Math.random() * 1440); // Within last day
+
+                    ips.push({
+                        ip_address: ip,
+                        country_code: countries[index % countries.length],
+                        threat_count: Math.floor(Math.random() * 50) + 1,
+                        risk_score: (Math.random() * 1).toFixed(3),
+                        first_seen: firstSeen.toLocaleString(),
+                        last_activity: lastActivity.toLocaleString(),
+                        status: statuses[Math.floor(Math.random() * statuses.length)],
+                        is_blocked: Math.random() > 0.5
+                    });
+                });
+
+                return ips;
+            }
+
+            function renderIPsTable(ips) {
+                const tableBody = document.getElementById('ipsTableBody');
+                tableBody.innerHTML = ips.map(ip => `
+                    <tr class="fade-in">
+                        <td>
+                            <div class="form-check">
+                                <input type="checkbox" value="${ip.ip_address}" class="form-check-input ip-checkbox" onchange="toggleIPSelection('${ip.ip_address}')">
+                            </div>
+                        </td>
+                        <td class="ip-address">${ip.ip_address}</td>
+                        <td>${ip.country_code}</td>
+                        <td>${ip.threat_count}</td>
+                        <td>${ip.risk_score}</td>
+                        <td class="timestamp">${ip.first_seen}</td>
+                        <td class="timestamp">${ip.last_activity}</td>
+                        <td><span class="badge bg-${ip.is_blocked ? 'warning' : 'danger'}">${ip.is_blocked ? 'Blocked' : 'Active'}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="showIPDetails('${ip.ip_address}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="blockIP('${ip.ip_address}')">
+                                <i class="fas fa-ban"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            function updateIPStats() {
+                // Update statistics
+                document.getElementById('blockedIPsCount').textContent = Math.floor(Math.random() * 50);
+                document.getElementById('watchlistIPsCount').textContent = Math.floor(Math.random() * 25);
+                document.getElementById('uniqueCountriesCount').textContent = Math.floor(Math.random() * 15) + 10;
+                document.getElementById('whitelistedIPsCount').textContent = Math.floor(Math.random() * 100);
+                
+                // Add animation to updated values
+                const elements = ['blockedIPsCount', 'watchlistIPsCount', 'uniqueCountriesCount', 'whitelistedIPsCount'];
+                elements.forEach(id => {
+                    const el = document.getElementById(id);
+                    el.classList.add('pop-in');
+                    setTimeout(() => el.classList.remove('pop-in'), 500);
+                });
+            }
+
+            function toggleSelectAllIPs() {
+                const selectAll = document.getElementById('selectAllIPs');
+                const checkboxes = document.querySelectorAll('.ip-checkbox');
+                
+                checkboxes.forEach(cb => {
+                    cb.checked = selectAll.checked;
+                    if (selectAll.checked) {
+                        if (!selectedIPs.includes(cb.value)) {
+                            selectedIPs.push(cb.value);
+                        }
+                    } else {
+                        selectedIPs = [];
+                    }
+                });
+            }
+
+            function toggleIPSelection(ip) {
+                const index = selectedIPs.indexOf(ip);
+                if (index > -1) {
+                    selectedIPs.splice(index, 1);
+                } else {
+                    selectedIPs.push(ip);
+                }
+            }
+
+            function lookupIP() {
+                const ip = document.getElementById('ipLookupInput').value.trim();
+                if (!ip) {
+                    showNotification('Please enter an IP address', 'warning');
+                    return;
+                }
+
+                const resultDiv = document.getElementById('ipLookupResult');
+                resultDiv.innerHTML = `
+                    <div class="alert alert-info glass-card fade-in">
+                        <h6><i class="fas fa-search me-2"></i>IP Analysis: ${ip}</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Country:</strong> United States</p>
+                                <p class="mb-1"><strong>ISP:</strong> Example ISP Inc.</p>
+                                <p class="mb-1"><strong>Organization:</strong> Example Corp</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Risk Score:</strong> <span class="badge bg-danger">0.75 (High)</span></p>
+                                <p class="mb-1"><strong>Threat Intelligence:</strong> Listed in 2 threat feeds</p>
+                                <p class="mb-1"><strong>Reputation:</strong> <span class="badge bg-danger">Malicious</span></p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                showNotification(`IP analysis completed for ${ip}`, 'success');
+            }
+
+            function showIPDetails(ip) {
+                currentIP = ip;
+                const modal = new bootstrap.Modal(document.getElementById('ipDetailsModal'));
+                document.getElementById('ipDetailsContent').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-info-circle me-2 text-primary"></i>IP Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>IP Address:</strong> <span class="ip-address">${ip}</span></p>
+                                    <p class="mb-1"><strong>Country:</strong> United States</p>
+                                    <p class="mb-1"><strong>City:</strong> New York</p>
+                                    <p class="mb-1"><strong>ISP:</strong> Example ISP Inc.</p>
+                                    <p class="mb-1"><strong>Organization:</strong> Example Corp</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Threat Intelligence</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>Risk Score:</strong> <span class="badge bg-danger">0.85</span></p>
+                                    <p class="mb-1"><strong>Threat Feeds:</strong> 3 matches</p>
+                                    <p class="mb-1"><strong>Malware:</strong> <span class="badge bg-danger">Yes</span></p>
+                                    <p class="mb-1"><strong>Botnet:</strong> <span class="badge bg-warning">Suspected</span></p>
+                                    <p class="mb-1"><strong>Reputation:</strong> <span class="badge bg-danger">Malicious</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card glass-card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-history me-2 text-info"></i>Recent Activity</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="list-group">
+                                        <div class="list-group-item bg-dark-theme-card mb-2 glass-card">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Port scan detected</h6>
+                                                <small class="text-muted">2 hours ago</small>
+                                            </div>
+                                            <p class="mb-1">Scanned ports 22, 80, 443, 8080</p>
+                                            <small class="text-muted">Risk Score: 0.78</small>
+                                        </div>
+                                        <div class="list-group-item bg-dark-theme-card glass-card">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Brute force attempt</h6>
+                                                <small class="text-muted">5 hours ago</small>
+                                            </div>
+                                            <p class="mb-1">Multiple failed login attempts detected</p>
+                                            <small class="text-muted">Risk Score: 0.65</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                modal.show();
+            }
+
+            function showIPMap() {
+                const modal = new bootstrap.Modal(document.getElementById('ipMapModal'));
+                modal.show();
+            }
+
+            function refreshMap() {
+                showNotification('Threat map refreshed', 'success');
+            }
+
+            function refreshIPData() {
+                document.getElementById('ipsTableBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted"><div class="loading-spinner"></div><span class="ms-2">Loading IP data...</span></td></tr>';
+                setTimeout(() => {
+                    loadIPData();
+                    updateIPStats();
+                }, 1000);
+                showNotification('IP data refreshed', 'success');
+            }
+
+            function exportIPData() {
+                showNotification('IP data export started', 'info');
+                setTimeout(() => {
+                    showNotification('IP data exported successfully', 'success');
+                }, 2000);
+            }
+
+            function blockIP(ip) {
+                if (confirm(`Block IP address ${ip}?`)) {
+                    showNotification(`IP ${ip} has been blocked`, 'success');
+                }
+            }
+
+            function blockCurrentIP() {
+                blockIP(currentIP);
+                bootstrap.Modal.getInstance(document.getElementById('ipDetailsModal')).hide();
+            }
+
+            function addToWatchlist() {
+                showNotification(`IP ${currentIP} added to watchlist`, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('ipDetailsModal')).hide();
+            }
+
+            function bulkBlock() {
+                if (selectedIPs.length === 0) {
+                    showNotification('No IPs selected', 'warning');
+                    return;
+                }
+                if (confirm(`Block ${selectedIPs.length} selected IPs?`)) {
+                    showNotification(`${selectedIPs.length} IPs have been blocked`, 'success');
+                    selectedIPs = [];
+                }
+            }
+
+            function bulkAddToWatchlist() {
+                if (selectedIPs.length === 0) {
+                    showNotification('No IPs selected', 'warning');
+                    return;
+                }
+                if (confirm(`Add ${selectedIPs.length} selected IPs to watchlist?`)) {
+                    showNotification(`${selectedIPs.length} IPs added to watchlist`, 'success');
+                    selectedIPs = [];
+                }
+            }
+
+            function bulkWhitelist() {
+                if (selectedIPs.length === 0) {
+                    showNotification('No IPs selected', 'warning');
+                    return;
+                }
+                if (confirm(`Add ${selectedIPs.length} selected IPs to whitelist?`)) {
+                    showNotification(`${selectedIPs.length} IPs added to whitelist`, 'success');
+                    selectedIPs = [];
+                }
+            }
+
+            function bulkExport() {
+                if (selectedIPs.length === 0) {
+                    showNotification('No IPs selected', 'warning');
+                    return;
+                }
+                showNotification(`${selectedIPs.length} IPs exported successfully`, 'success');
+                selectedIPs = [];
+            }
+
+            function applyFilters() {
+                const searchTerm = document.getElementById('ipSearch').value.toLowerCase();
+                const country = document.getElementById('countryFilter').value;
+                const riskLevel = document.getElementById('riskFilter').value;
+                const status = document.getElementById('statusFilter').value;
+                
+                // In a real implementation, this would filter the IP data
+                showNotification('Filters applied to IP data', 'info');
+            }
+
+            function resetFilters() {
+                document.getElementById('ipSearch').value = '';
+                document.getElementById('countryFilter').value = '';
+                document.getElementById('riskFilter').value = '';
+                document.getElementById('statusFilter').value = '';
+                showNotification('Filters reset', 'info');
+            }
+
+            function setGeoTimeRange(range) {
+                // Update active button
+                document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                showNotification(`Geographic time range set to ${range}`, 'info');
+            }
+
+            function setActivityTimeRange(range) {
+                // Update active button
+                document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                showNotification(`Activity time range set to ${range}`, 'info');
+            }
+
+            function showNotification(message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    const container = document.createElement('div');
+                    container.id = 'toastContainer';
+                    container.style.position = 'fixed';
+                    container.style.top = '20px';
+                    container.style.right = '20px';
+                    container.style.zIndex = '9999';
+                    document.body.appendChild(container);
+                }
+                
+                const toastId = `toast-${Date.now()}`;
+                
+                const toastHTML = `
+                    <div id="${toastId}" class="toast fade show mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                        <div class="toast-header bg-${type} text-white glass-card">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                            <strong class="me-auto">ThreatX Notification</strong>
+                            <small class="text-white">Just now</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body glass-card">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHTML);
+                
+                const toastEl = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                
+                setTimeout(() => {
+                    if (toastEl) {
+                        toastEl.remove();
+                    }
+                }, 5000);
+            }
+        </script>
+    </div>
+</body>
+</html>

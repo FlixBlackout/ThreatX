@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::content})}">
+<head>
+    <title>Threat Analysis - ThreatX Dashboard</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <!-- Alert messages -->
+        <div class="container-fluid mt-3" th:if="${alertMessage}">
+            <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span th:text="${alertMessage}">Alert message</span>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="container-fluid mt-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+                <div>
+                    <h1 class="mb-2"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Threat Analysis</h1>
+                    <p class="mb-0 text-gray-300">Detailed view of detected security threats</p>
+                </div>
+                <div class="mt-3 mt-md-0">
+                    <div class="d-flex flex-wrap gap-2">
+                        <!-- Time Range Selector -->
+                        <div class="btn-group" role="group">
+                            <a th:href="@{/threats(timeRange='1h')}" 
+                               class="btn btn-outline-primary btn-sm" 
+                               th:classappend="${timeRange == '1h' ? 'active' : ''}">1H</a>
+                            <a th:href="@{/threats(timeRange='24h')}" 
+                               class="btn btn-outline-primary btn-sm" 
+                               th:classappend="${timeRange == '24h' ? 'active' : ''}">24H</a>
+                            <a th:href="@{/threats(timeRange='7d')}" 
+                               class="btn btn-outline-primary btn-sm" 
+                               th:classappend="${timeRange == '7d' ? 'active' : ''}">7D</a>
+                            <a th:href="@{/threats(timeRange='30d')}" 
+                               class="btn btn-outline-primary btn-sm" 
+                               th:classappend="${timeRange == '30d' ? 'active' : ''}">30D</a>
+                        </div>
+                        <a href="/export/threats?format=csv" class="btn btn-success btn-sm">
+                            <i class="fas fa-download me-1"></i>Export CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Threat Statistics Row -->
+            <div class="row mb-4 g-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-danger shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                        High Risk Threats
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" 
+                                         th:text="${threatStats?.threat_counts?.HIGH ?: 0}">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-skull-crossbones fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-warning shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                        Medium Risk Threats
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" 
+                                         th:text="${threatStats?.threat_counts?.MEDIUM ?: 0}">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-info shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                        Low Risk Threats
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" 
+                                         th:text="${threatStats?.threat_counts?.LOW ?: 0}">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-info-circle fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-primary shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                        Total Threats
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" 
+                                         th:text="${threatStats?.total_threats ?: 0}">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-shield-alt fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row mb-4 g-4">
+                <!-- Threat Timeline Chart -->
+                <div class="col-xl-8 col-lg-7">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Threat Timeline</h6>
+                            <div class="dropdown no-arrow">
+                                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink"
+                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in">
+                                    <div class="dropdown-header">Filter by Risk:</div>
+                                    <a class="dropdown-item" href="?risk=HIGH">High Risk</a>
+                                    <a class="dropdown-item" href="?risk=MEDIUM">Medium Risk</a>
+                                    <a class="dropdown-item" href="?risk=LOW">Low Risk</a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="?">All Threats</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-area">
+                                <canvas id="threatTimelineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Threat Types Distribution -->
+                <div class="col-xl-4 col-lg-5">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Threat Categories</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-pie pt-4 pb-2">
+                                <canvas id="threatCategoriesChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Filtering and Search -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Advanced Threat Filtering</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label for="riskFilter" class="form-label">Risk Level</label>
+                                    <select class="form-control" id="riskFilter">
+                                        <option value="">All Risk Levels</option>
+                                        <option value="HIGH">High Risk</option>
+                                        <option value="MEDIUM">Medium Risk</option>
+                                        <option value="LOW">Low Risk</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="categoryFilter" class="form-label">Threat Category</label>
+                                    <select class="form-control" id="categoryFilter">
+                                        <option value="">All Categories</option>
+                                        <option value="DoS Attack">DoS Attack</option>
+                                        <option value="Probe">Probe</option>
+                                        <option value="R2L">R2L</option>
+                                        <option value="U2R">U2R</option>
+                                        <option value="Unknown">Unknown</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="dateRangeFilter" class="form-label">Date Range</label>
+                                    <input type="text" class="form-control" id="dateRangeFilter" placeholder="Select date range">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="ipSearch" class="form-label">IP Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                        <input type="text" class="form-control" id="ipSearch" placeholder="Search IP...">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12 d-flex justify-content-end">
+                                    <button class="btn btn-outline-secondary me-2" id="resetFilters">
+                                        <i class="fas fa-redo me-1"></i>Reset
+                                    </button>
+                                    <button class="btn btn-primary" id="applyFilters">
+                                        <i class="fas fa-filter me-1"></i>Apply Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Threats Table -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow mb-4 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Detailed Threat Analysis</h6>
+                            <div class="d-flex gap-2">
+                                <div class="input-group input-group-sm" style="width: 250px;">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" class="form-control" placeholder="Search threats..." id="threatSearch">
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown">
+                                        <i class="fas fa-filter me-1"></i>Filter
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item" href="?risk=HIGH">High Risk</a>
+                                        <a class="dropdown-item" href="?risk=MEDIUM">Medium Risk</a>
+                                        <a class="dropdown-item" href="?risk=LOW">Low Risk</a>
+                                        <div class="dropdown-divider"></div>
+                                        <a class="dropdown-item" href="?">All Threats</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="threatsTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th scope="col" class="sortable" data-sort="timestamp">
+                                                Timestamp <i class="fas fa-sort"></i>
+                                            </th>
+                                            <th scope="col" class="sortable" data-sort="riskLevel">
+                                                Risk Level <i class="fas fa-sort"></i>
+                                            </th>
+                                            <th scope="col" class="sortable" data-sort="ipAddress">
+                                                IP Address <i class="fas fa-sort"></i>
+                                            </th>
+                                            <th scope="col" class="sortable" data-sort="userId">
+                                                User ID <i class="fas fa-sort"></i>
+                                            </th>
+                                            <th scope="col" class="sortable" data-sort="category">
+                                                Threat Category <i class="fas fa-sort"></i>
+                                            </th>
+                                            <th scope="col" class="sortable" data-sort="riskScore">
+                                                Risk Score <i class="fas fa-sort"></i>
+                                            </th>
+                                            <th scope="col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="threatsTableBody">
+                                        <!-- Threats will be populated here -->
+                                        <tr>
+                                            <td colspan="7" class="text-center">
+                                                <div class="loading-spinner"></div>
+                                                <span class="ms-2">Loading threat data...</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination -->
+                            <nav aria-label="Threats pagination" th:if="${totalPages > 1}">
+                                <ul class="pagination justify-content-center mb-0">
+                                    <li class="page-item" th:classappend="${currentPage <= 1 ? 'disabled' : ''}">
+                                        <a class="page-link" th:href="@{/threats(page=${currentPage - 1}, timeRange=${timeRange})}">
+                                            <i class="fas fa-chevron-left"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item" th:each="page : ${#numbers.sequence(1, totalPages)}" 
+                                        th:classappend="${page == currentPage ? 'active' : ''}">
+                                        <a class="page-link" th:href="@{/threats(page=${page}, timeRange=${timeRange})}" th:text="${page}">1</a>
+                                    </li>
+                                    <li class="page-item" th:classappend="${currentPage >= totalPages ? 'disabled' : ''}">
+                                        <a class="page-link" th:href="@{/threats(page=${currentPage + 1}, timeRange=${timeRange})}">
+                                            <i class="fas fa-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Threat Details Modal -->
+        <div class="modal fade" id="threatDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content glass-card">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Threat Details</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="threatDetailsContent">
+                        <!-- Threat details will be loaded here -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-danger" onclick="blockThreatSource()">
+                            <i class="fas fa-ban me-1"></i>Block Source
+                        </button>
+                        <button type="button" class="btn btn-warning" onclick="markAsFalsePositive()">
+                            <i class="fas fa-times-circle me-1"></i>False Positive
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script th:inline="javascript">
+            const threatStats = /*[[${threatStats}]]*/ {};
+            const timeRange = /*[[${timeRange}]]*/ '24h';
+
+            document.addEventListener('DOMContentLoaded', function() {
+                initializeCharts();
+                loadThreatsTable();
+                initializeAdvancedFilters();
+                
+                // Add search functionality
+                document.getElementById('threatSearch').addEventListener('input', function(e) {
+                    filterThreats(e.target.value);
+                });
+                
+                // Initialize sortable table headers
+                initializeSortableTable();
+            });
+
+            function initializeAdvancedFilters() {
+                // Initialize date range picker (simulated)
+                const dateRangeFilter = document.getElementById('dateRangeFilter');
+                if (dateRangeFilter) {
+                    dateRangeFilter.addEventListener('click', function() {
+                        this.value = '2024-01-01 to 2024-01-31';
+                    });
+                }
+                
+                // Apply filters button
+                document.getElementById('applyFilters').addEventListener('click', function() {
+                    const riskFilter = document.getElementById('riskFilter').value;
+                    const categoryFilter = document.getElementById('categoryFilter').value;
+                    const ipSearch = document.getElementById('ipSearch').value;
+                    
+                    // In a real implementation, this would filter the table data
+                    showNotification(`Filters applied: Risk=${riskFilter || 'All'}, Category=${categoryFilter || 'All'}, IP=${ipSearch || 'All'}`, 'info');
+                });
+                
+                // Reset filters button
+                document.getElementById('resetFilters').addEventListener('click', function() {
+                    document.getElementById('riskFilter').value = '';
+                    document.getElementById('categoryFilter').value = '';
+                    document.getElementById('dateRangeFilter').value = '';
+                    document.getElementById('ipSearch').value = '';
+                    showNotification('Filters reset', 'info');
+                });
+            }
+
+            function initializeSortableTable() {
+                const headers = document.querySelectorAll('.sortable');
+                headers.forEach(header => {
+                    header.addEventListener('click', function() {
+                        const sortKey = this.getAttribute('data-sort');
+                        sortTable(sortKey);
+                        
+                        // Update sort icons
+                        headers.forEach(h => {
+                            const icon = h.querySelector('i');
+                            if (h === this) {
+                                icon.className = icon.className.includes('fa-sort-up') ? 'fas fa-sort-down' : 'fas fa-sort-up';
+                            } else {
+                                icon.className = 'fas fa-sort';
+                            }
+                        });
+                    });
+                });
+            }
+
+            function sortTable(sortKey) {
+                // In a real implementation, this would sort the table data
+                showNotification(`Sorting by ${sortKey}`, 'info');
+            }
+
+            function initializeCharts() {
+                // Threat Timeline Chart
+                const timelineCtx = document.getElementById('threatTimelineChart').getContext('2d');
+                new Chart(timelineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: generateTimeLabels(),
+                        datasets: [{
+                            label: 'High Risk',
+                            data: generateRandomData(24, 0, 10),
+                            borderColor: '#ef476f',
+                            backgroundColor: 'rgba(239, 71, 111, 0.1)',
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#ef476f',
+                            fill: true
+                        }, {
+                            label: 'Medium Risk',
+                            data: generateRandomData(24, 0, 15),
+                            borderColor: '#ffd166',
+                            backgroundColor: 'rgba(255, 209, 102, 0.1)',
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#ffd166',
+                            fill: true
+                        }, {
+                            label: 'Low Risk',
+                            data: generateRandomData(24, 0, 20),
+                            borderColor: '#1b9aaa',
+                            backgroundColor: 'rgba(27, 154, 170, 0.1)',
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#1b9aaa',
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Threat Detection Timeline',
+                                color: '#e2e8f0',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeOutQuart'
+                        }
+                    }
+                });
+
+                // Threat Categories Chart
+                const categoriesCtx = document.getElementById('threatCategoriesChart').getContext('2d');
+                new Chart(categoriesCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['DoS Attack', 'Probe', 'R2L', 'U2R', 'Unknown', 'Other'],
+                        datasets: [{
+                            data: [25, 20, 15, 10, 20, 10],
+                            backgroundColor: [
+                                '#ef476f',
+                                '#ffd166',
+                                '#1b9aaa',
+                                '#06d6a0',
+                                '#6c757d',
+                                '#9b5de5'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 15
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: {
+                                        size: 11
+                                    },
+                                    padding: 15
+                                }
+                            }
+                        },
+                        cutout: '60%',
+                        animation: {
+                            animateRotate: true,
+                            animateScale: true,
+                            duration: 1000
+                        }
+                    }
+                });
+            }
+
+            function generateTimeLabels() {
+                const labels = [];
+                for (let i = 23; i >= 0; i--) {
+                    const date = new Date();
+                    date.setHours(date.getHours() - i);
+                    labels.push(date.getHours() + ':00');
+                }
+                return labels;
+            }
+
+            function generateRandomData(count, min, max) {
+                const data = [];
+                for (let i = 0; i < count; i++) {
+                    data.push(Math.floor(Math.random() * (max - min + 1)) + min);
+                }
+                return data;
+            }
+
+            function loadThreatsTable() {
+                // Simulate loading threat data
+                setTimeout(() => {
+                    const tableBody = document.getElementById('threatsTableBody');
+                    const sampleThreats = generateSampleThreats();
+                    
+                    tableBody.innerHTML = sampleThreats.map(threat => `
+                        <tr class="fade-in">
+                            <td class="timestamp">${threat.timestamp}</td>
+                            <td><span class="badge bg-${getRiskBadgeClass(threat.riskLevel)}">${threat.riskLevel}</span></td>
+                            <td class="ip-address">${threat.ipAddress}</td>
+                            <td>${threat.userId}</td>
+                            <td><span class="threat-tag">${threat.category}</span></td>
+                            <td>${threat.riskScore}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" onclick="showThreatDetails('${threat.id}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="blockThreat('${threat.id}')">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }, 1000);
+            }
+
+            function generateSampleThreats() {
+                const threats = [];
+                const riskLevels = ['HIGH', 'MEDIUM', 'LOW'];
+                const categories = ['DoS Attack', 'Probe', 'R2L', 'U2R', 'Unknown'];
+                const ipAddresses = ['192.168.1.100', '10.0.0.50', '203.0.113.45', '198.51.100.30', '185.220.101.5'];
+                const users = ['alice.johnson', 'bob.smith', 'charlie.brown', 'diana.prince', 'eve.adams'];
+
+                for (let i = 0; i < 20; i++) {
+                    const date = new Date();
+                    date.setMinutes(date.getMinutes() - Math.random() * 1440);
+                    
+                    threats.push({
+                        id: `threat_${i}`,
+                        timestamp: date.toLocaleString(),
+                        riskLevel: riskLevels[Math.floor(Math.random() * riskLevels.length)],
+                        ipAddress: ipAddresses[Math.floor(Math.random() * ipAddresses.length)],
+                        userId: users[Math.floor(Math.random() * users.length)],
+                        category: categories[Math.floor(Math.random() * categories.length)],
+                        riskScore: (Math.random() * 1).toFixed(3)
+                    });
+                }
+
+                return threats.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            }
+
+            function getRiskBadgeClass(riskLevel) {
+                switch(riskLevel) {
+                    case 'HIGH': return 'danger';
+                    case 'MEDIUM': return 'warning';
+                    case 'LOW': return 'info';
+                    default: return 'secondary';
+                }
+            }
+
+            function showThreatDetails(threatId) {
+                // Load threat details
+                const modal = new bootstrap.Modal(document.getElementById('threatDetailsModal'));
+                document.getElementById('threatDetailsContent').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-info-circle me-2 text-primary"></i>Threat Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>Threat ID:</strong> ${threatId}</p>
+                                    <p class="mb-1"><strong>Detection Time:</strong> ${new Date().toLocaleString()}</p>
+                                    <p class="mb-1"><strong>Risk Score:</strong> <span class="badge bg-danger">0.875</span></p>
+                                    <p class="mb-1"><strong>Confidence:</strong> <span class="badge bg-success">92%</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-network-wired me-2 text-info"></i>Source Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>IP Address:</strong> <span class="ip-address">192.168.1.100</span></p>
+                                    <p class="mb-1"><strong>User Agent:</strong> Mozilla/5.0...</p>
+                                    <p class="mb-1"><strong>Country:</strong> United States</p>
+                                    <p class="mb-1"><strong>ISP:</strong> Example ISP</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Threat Analysis</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>Category:</strong> DoS Attack</p>
+                                    <p class="mb-1"><strong>Attack Types:</strong> Connection Flood, Bandwidth Exhaustion</p>
+                                    <p class="mb-1"><strong>Pattern Match:</strong> 98.5%</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2 text-success"></i>Recommendations</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="mb-0">
+                                        <li>Implement rate limiting on the affected service</li>
+                                        <li>Monitor bandwidth usage for unusual spikes</li>
+                                        <li>Consider blocking source IP at firewall level</li>
+                                        <li>Review and update DoS protection policies</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card glass-card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-chart-line me-2 text-info"></i>Behavioral Analysis</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="geo-map-container mb-3">
+                                        <div class="text-center">
+                                            <i class="fas fa-globe-americas fa-3x text-primary mb-2"></i>
+                                            <p class="mb-0">Geographic threat visualization would appear here</p>
+                                            <small class="text-muted">Showing attack origin and propagation patterns</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-center">
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-outline-primary btn-sm">24H</button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm active">7D</button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm">30D</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                modal.show();
+            }
+
+            function blockThreat(threatId) {
+                if (confirm('Are you sure you want to block this threat source?')) {
+                    // Implementation for blocking threat
+                    showNotification('Threat source blocked successfully', 'success');
+                }
+            }
+
+            function blockThreatSource() {
+                showNotification('Threat source has been blocked', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('threatDetailsModal')).hide();
+            }
+
+            function markAsFalsePositive() {
+                showNotification('Threat marked as false positive', 'info');
+                bootstrap.Modal.getInstance(document.getElementById('threatDetailsModal')).hide();
+            }
+
+            function filterThreats(searchTerm) {
+                const rows = document.querySelectorAll('#threatsTableBody tr');
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(searchTerm.toLowerCase()) ? '' : 'none';
+                });
+            }
+
+            function showNotification(message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    const container = document.createElement('div');
+                    container.id = 'toastContainer';
+                    container.style.position = 'fixed';
+                    container.style.top = '20px';
+                    container.style.right = '20px';
+                    container.style.zIndex = '9999';
+                    document.body.appendChild(container);
+                }
+                
+                const toastId = `toast-${Date.now()}`;
+                
+                const toastHTML = `
+                    <div id="${toastId}" class="toast fade show mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                        <div class="toast-header bg-${type} text-white glass-card">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                            <strong class="me-auto">ThreatX Notification</strong>
+                            <small class="text-white">Just now</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body glass-card">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHTML);
+                
+                const toastEl = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                
+                setTimeout(() => {
+                    if (toastEl) {
+                        toastEl.remove();
+                    }
+                }, 5000);
+            }
+        </script>
+    </div>
+</body>
+</html>

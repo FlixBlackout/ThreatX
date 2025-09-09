@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::content})}">
+<head>
+    <title>Settings - ThreatX Dashboard</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <!-- Alert messages -->
+        <div class="container-fluid mt-3" th:if="${alertMessage}">
+            <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span th:text="${alertMessage}">Alert message</span>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="container-fluid mt-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+                <div>
+                    <h1 class="mb-2"><i class="fas fa-cog me-2 text-primary"></i>System Settings & Configuration</h1>
+                    <p class="mb-0 text-gray-300">Configure and manage your ThreatX dashboard preferences</p>
+                </div>
+                <div class="mt-3 mt-md-0">
+                    <span class="badge bg-success pulse glass-card" th:classappend="${aiEngineOnline ? 'bg-success' : 'bg-danger'}">
+                        <i class="fas fa-robot me-1"></i>AI Engine: <span th:text="${aiEngineOnline ? 'Online' : 'Offline'}">Status</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Settings Navigation Tabs -->
+            <ul class="nav nav-tabs glass-card" id="settingsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button">
+                        <i class="fas fa-cog me-1"></i> General
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="ai-engine-tab" data-bs-toggle="tab" data-bs-target="#ai-engine" type="button">
+                        <i class="fas fa-robot me-1"></i> AI Engine
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button">
+                        <i class="fas fa-bell me-1"></i> Alerts
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button">
+                        <i class="fas fa-shield-alt me-1"></i> Security
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Settings Tab Content -->
+            <div class="tab-content glass-card" id="settingsTabContent">
+                
+                <!-- General Settings -->
+                <div class="tab-pane fade show active" id="general" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-lg-8">
+                            <div class="card shadow h-100 glass-card">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary">General Configuration</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form id="generalSettingsForm">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="dashboardTitle" class="form-label">Dashboard Title</label>
+                                                <input type="text" class="form-control glass-card" id="dashboardTitle" value="ThreatX Security Dashboard">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="refreshInterval" class="form-label">Auto Refresh Interval</label>
+                                                <select class="form-control glass-card" id="refreshInterval">
+                                                    <option value="30" selected>30 seconds</option>
+                                                    <option value="60">1 minute</option>
+                                                    <option value="300">5 minutes</option>
+                                                    <option value="0">Disabled</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save me-1"></i>Save General Settings
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Engine Settings -->
+                <div class="tab-pane fade" id="ai-engine" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-lg-8">
+                            <div class="card shadow h-100 glass-card">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary">AI Engine Configuration</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form id="aiEngineForm">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="aiEngineUrl" class="form-label">AI Engine URL</label>
+                                                <input type="url" class="form-control glass-card" id="aiEngineUrl" value="http://localhost:5000">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="riskThresholdHigh" class="form-label">High Risk Threshold</label>
+                                                <input type="number" class="form-control glass-card" id="riskThresholdHigh" value="0.75" min="0" max="1" step="0.01">
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="enableDatasets" checked>
+                                                <label class="form-check-label" for="enableDatasets">
+                                                    Enable NSL-KDD Dataset Training
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save me-1"></i>Save AI Engine Settings
+                                            </button>
+                                            <button type="button" class="btn btn-outline-info ms-2" onclick="testAIConnection()">
+                                                <i class="fas fa-plug me-1"></i>Test Connection
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    <div class="mt-4 pt-3 border-top">
+                                        <h6 class="mb-3">Model Management</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p class="mb-1"><strong>Model Version:</strong> v1.2.0</p>
+                                                <p class="mb-1"><strong>Training Samples:</strong> 125,973</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <form th:action="@{/retrain-models}" method="post">
+                                                    <button type="submit" class="btn btn-warning w-100">
+                                                        <i class="fas fa-sync me-1"></i> Retrain Models
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerts Settings -->
+                <div class="tab-pane fade" id="alerts" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-lg-8">
+                            <div class="card shadow h-100 glass-card">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary">Alert Configuration</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form id="alertsForm">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Email Notifications</label>
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="emailAlertsHigh" checked>
+                                                    <label class="form-check-label" for="emailAlertsHigh">High Risk Threats</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="emailAlertsSystem" checked>
+                                                    <label class="form-check-label" for="emailAlertsSystem">System Events</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="emailRecipients" class="form-label">Email Recipients</label>
+                                                <textarea class="form-control glass-card" id="emailRecipients" rows="3" placeholder="admin@company.com"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save me-1"></i>Save Alert Settings
+                                            </button>
+                                            <button type="button" class="btn btn-outline-warning ms-2" onclick="sendTestAlert()">
+                                                <i class="fas fa-paper-plane me-1"></i>Send Test Alert
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Settings -->
+                <div class="tab-pane fade" id="security" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-lg-8">
+                            <div class="card shadow h-100 glass-card">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary">Security Configuration</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form id="securityForm">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="sessionTimeout" class="form-label">Session Timeout (minutes)</label>
+                                                <input type="number" class="form-control glass-card" id="sessionTimeout" value="60" min="5" max="480">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="maxLoginAttempts" class="form-label">Max Login Attempts</label>
+                                                <input type="number" class="form-control glass-card" id="maxLoginAttempts" value="5" min="3" max="10">
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="requireMfa" checked>
+                                                <label class="form-check-label" for="requireMfa">
+                                                    Require Multi-Factor Authentication
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save me-1"></i>Save Security Settings
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Settings form handlers
+            document.getElementById('generalSettingsForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                showNotification('General settings saved successfully!', 'success');
+            });
+
+            document.getElementById('aiEngineForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                showNotification('AI Engine settings saved successfully!', 'success');
+            });
+
+            document.getElementById('alertsForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                showNotification('Alert settings saved successfully!', 'success');
+            });
+
+            document.getElementById('securityForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                showNotification('Security settings saved successfully!', 'success');
+            });
+
+            function testAIConnection() {
+                const url = document.getElementById('aiEngineUrl').value;
+                // Show loading state
+                const btn = event.target;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing...';
+                btn.disabled = true;
+                
+                // Simulate API call
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    showNotification('AI Engine connection successful!', 'success');
+                }, 1500);
+            }
+
+            function sendTestAlert() {
+                showNotification('Test alert sent successfully!', 'info');
+            }
+
+            function showNotification(message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    const container = document.createElement('div');
+                    container.id = 'toastContainer';
+                    container.style.position = 'fixed';
+                    container.style.top = '20px';
+                    container.style.right = '20px';
+                    container.style.zIndex = '9999';
+                    document.body.appendChild(container);
+                }
+                
+                const toastId = `toast-${Date.now()}`;
+                
+                const toastHTML = `
+                    <div id="${toastId}" class="toast fade show mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                        <div class="toast-header bg-${type} text-white glass-card">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                            <strong class="me-auto">ThreatX Notification</strong>
+                            <small class="text-white">Just now</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body glass-card">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHTML);
+                
+                const toastEl = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                
+                setTimeout(() => {
+                    if (toastEl) {
+                        toastEl.remove();
+                    }
+                }, 5000);
+            }
+        </script>
+    </div>
+</body>
+</html>

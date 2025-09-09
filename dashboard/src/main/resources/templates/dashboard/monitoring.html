@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::content})}">
+<head>
+    <title>Real-time Monitoring - ThreatX Dashboard</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <!-- Alert messages -->
+        <div class="container-fluid mt-3" th:if="${alertMessage}">
+            <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span th:text="${alertMessage}">Alert message</span>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="container-fluid mt-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+                <div>
+                    <h1 class="mb-2"><i class="fas fa-eye me-2 text-info"></i>Real-time Monitoring</h1>
+                    <p class="mb-0 text-gray-300">Live threat detection and network activity monitoring</p>
+                </div>
+                <div class="mt-3 mt-md-0">
+                    <span class="badge bg-success pulse glass-card" th:classappend="${aiEngineOnline ? 'bg-success' : 'bg-danger'}">
+                        <i class="fas fa-robot me-1"></i>AI Engine: <span th:text="${aiEngineOnline ? 'Online' : 'Offline'}">Status</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Real-time Stats Row -->
+            <div class="row mb-4 g-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-primary shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                        Live Threats
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="liveThreatsCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-danger shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                        Active Alerts
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="activeAlertsCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-bell fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-warning shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                        Connections/min
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="connectionsPerMin">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-network-wired fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-info shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                        System Load
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="systemLoad">0%</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-server fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Feed and Charts Row -->
+            <div class="row g-4 mb-4">
+                <!-- Live Threat Feed -->
+                <div class="col-lg-6">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Live Threat Feed</h6>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-primary" onclick="clearLiveFeed()">
+                                    <i class="fas fa-trash me-1"></i>Clear
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="pauseLiveFeed()" id="pauseButton">
+                                    <i class="fas fa-pause me-1"></i>Pause
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                            <div id="liveThreatFeed">
+                                <!-- Live threats will be populated here -->
+                                <div class="text-center text-muted py-5">
+                                    <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                                    <p class="mb-0">Waiting for live data...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Chart -->
+                <div class="col-lg-6">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Real-time Threat Activity</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="setChartTimeRange('1m')">1M</button>
+                                <button class="btn btn-outline-primary active" onclick="setChartTimeRange('5m')">5M</button>
+                                <button class="btn btn-outline-primary" onclick="setChartTimeRange('15m')">15M</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="height: 400px;">
+                                <canvas id="realTimeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Activity Map -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Network Activity Map</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary active">World</button>
+                                <button class="btn btn-outline-primary">Region</button>
+                                <button class="btn btn-outline-primary">Local</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="networkMap" class="geo-map-container">
+                                <div class="d-flex align-items-center justify-content-center h-100">
+                                    <div class="text-center">
+                                        <i class="fas fa-globe-americas fa-3x text-primary mb-3"></i>
+                                        <h5>Global Network Activity</h5>
+                                        <p class="text-muted mb-0">Real-time visualization of network traffic and threat sources</p>
+                                        <div class="mt-3">
+                                            <div class="d-inline-block me-3">
+                                                <i class="fas fa-circle text-danger me-1"></i> High Risk
+                                            </div>
+                                            <div class="d-inline-block me-3">
+                                                <i class="fas fa-circle text-warning me-1"></i> Medium Risk
+                                            </div>
+                                            <div class="d-inline-block">
+                                                <i class="fas fa-circle text-info me-1"></i> Low Risk
+                                            </div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <button class="btn btn-outline-primary" onclick="refreshNetworkMap()">
+                                                <i class="fas fa-sync-alt me-1"></i>Refresh Map
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Control Panel -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Monitoring Controls</h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                                <label class="form-check-label" for="autoRefreshToggle">Auto-refresh</label>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-success btn-block quick-actions" onclick="startMonitoring()">
+                                        <i class="fas fa-play me-2"></i>Start Monitoring
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-warning btn-block quick-actions" onclick="pauseMonitoring()">
+                                        <i class="fas fa-pause me-2"></i>Pause Monitoring
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-info btn-block quick-actions" onclick="exportLiveData()">
+                                        <i class="fas fa-download me-2"></i>Export Live Data
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-secondary btn-block quick-actions" onclick="resetMonitoring()">
+                                        <i class="fas fa-sync-alt me-2"></i>Reset View
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Advanced Settings -->
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="accordion" id="monitoringSettings">
+                                        <div class="accordion-item glass-card">
+                                            <h2 class="accordion-header" id="settingsHeading">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#settingsCollapse">
+                                                    <i class="fas fa-cog me-2"></i>Advanced Settings
+                                                </button>
+                                            </h2>
+                                            <div id="settingsCollapse" class="accordion-collapse collapse" data-bs-parent="#monitoringSettings">
+                                                <div class="accordion-body">
+                                                    <div class="row g-3">
+                                                        <div class="col-md-4">
+                                                            <label for="updateInterval" class="form-label">Update Interval (seconds)</label>
+                                                            <select class="form-control" id="updateInterval">
+                                                                <option value="1">1 second</option>
+                                                                <option value="5" selected>5 seconds</option>
+                                                                <option value="10">10 seconds</option>
+                                                                <option value="30">30 seconds</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label for="threatThreshold" class="form-label">Threat Detection Threshold</label>
+                                                            <select class="form-control" id="threatThreshold">
+                                                                <option value="low">Low Sensitivity</option>
+                                                                <option value="medium" selected>Medium Sensitivity</option>
+                                                                <option value="high">High Sensitivity</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label for="alertNotification" class="form-label">Alert Notifications</label>
+                                                            <select class="form-control" id="alertNotification">
+                                                                <option value="all">All Alerts</option>
+                                                                <option value="high" selected>High Risk Only</option>
+                                                                <option value="none">None</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="row mt-3">
+                                                        <div class="col-12 d-flex justify-content-end">
+                                                            <button class="btn btn-primary" onclick="saveSettings()">
+                                                                <i class="fas fa-save me-1"></i>Save Settings
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let isMonitoring = true;
+            let isPaused = false;
+            let liveFeedData = [];
+            let realTimeChart;
+            let updateInterval = 5000; // 5 seconds
+            let monitoringInterval;
+            let chartData = {
+                labels: [],
+                datasets: [{
+                    label: 'High Risk',
+                    data: [],
+                    borderColor: '#ef476f',
+                    backgroundColor: 'rgba(239, 71, 111, 0.1)',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#ef476f',
+                    fill: true
+                }, {
+                    label: 'Medium Risk',
+                    data: [],
+                    borderColor: '#ffd166',
+                    backgroundColor: 'rgba(255, 209, 102, 0.1)',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#ffd166',
+                    fill: true
+                }, {
+                    label: 'Low Risk',
+                    data: [],
+                    borderColor: '#1b9aaa',
+                    backgroundColor: 'rgba(27, 154, 170, 0.1)',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#1b9aaa',
+                    fill: true
+                }]
+            };
+
+            // Initialize real-time monitoring
+            document.addEventListener('DOMContentLoaded', function() {
+                initializeRealTimeChart();
+                startLiveUpdates();
+                
+                // Add event listeners for settings
+                document.getElementById('updateInterval').addEventListener('change', function() {
+                    updateInterval = parseInt(this.value) * 1000;
+                    if (monitoringInterval) {
+                        clearInterval(monitoringInterval);
+                        startLiveUpdates();
+                    }
+                });
+                
+                // Auto-refresh toggle
+                document.getElementById('autoRefreshToggle').addEventListener('change', function() {
+                    if (this.checked) {
+                        startLiveUpdates();
+                        showNotification('Auto-refresh enabled', 'success');
+                    } else {
+                        clearInterval(monitoringInterval);
+                        showNotification('Auto-refresh disabled', 'warning');
+                    }
+                });
+            });
+
+            function initializeRealTimeChart() {
+                const ctx = document.getElementById('realTimeChart').getContext('2d');
+                realTimeChart = new Chart(ctx, {
+                    type: 'line',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 700,
+                            easing: 'easeOutQuart'
+                        },
+                        scales: {
+                            x: {
+                                type: 'category',
+                                title: {
+                                    display: true,
+                                    text: 'Time',
+                                    color: '#e2e8f0',
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    color: '#94a3b8',
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Threat Count',
+                                    color: '#e2e8f0',
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: {
+                                        size: 12
+                                    },
+                                    padding: 15
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Live Threat Activity',
+                                color: '#e2e8f0',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        }
+                    }
+                });
+            }
+
+            function startLiveUpdates() {
+                if (!isMonitoring) return;
+                
+                // Clear existing interval
+                if (monitoringInterval) {
+                    clearInterval(monitoringInterval);
+                }
+                
+                // Update based on selected interval
+                monitoringInterval = setInterval(function() {
+                    if (!isPaused && isMonitoring && document.getElementById('autoRefreshToggle').checked) {
+                        updateLiveData();
+                    }
+                }, updateInterval);
+            }
+
+            function updateLiveData() {
+                // Generate mock data for demonstration
+                const highRisk = Math.floor(Math.random() * 5);
+                const mediumRisk = Math.floor(Math.random() * 10);
+                const lowRisk = Math.floor(Math.random() * 15);
+                
+                updateLiveStats({
+                    total_threats: highRisk + mediumRisk + lowRisk,
+                    high_risk_count: highRisk
+                });
+                
+                updateLiveFeed();
+                updateRealTimeChart(highRisk, mediumRisk, lowRisk);
+                
+                // Show notification for high risk threats
+                if (highRisk > 0) {
+                    showNotification(`Detected ${highRisk} new high-risk threats`, 'danger');
+                }
+            }
+
+            function updateLiveStats(data) {
+                document.getElementById('liveThreatsCount').textContent = data.total_threats || 0;
+                document.getElementById('activeAlertsCount').textContent = data.high_risk_count || 0;
+                document.getElementById('connectionsPerMin').textContent = Math.floor(Math.random() * 100);
+                document.getElementById('systemLoad').textContent = Math.floor(Math.random() * 100) + '%';
+                
+                // Add animation to updated values
+                const elements = ['liveThreatsCount', 'activeAlertsCount', 'connectionsPerMin', 'systemLoad'];
+                elements.forEach(id => {
+                    const el = document.getElementById(id);
+                    el.classList.add('pop-in');
+                    setTimeout(() => el.classList.remove('pop-in'), 500);
+                });
+            }
+
+            function updateLiveFeed() {
+                const feedContainer = document.getElementById('liveThreatFeed');
+                const timestamp = new Date().toLocaleTimeString();
+                
+                // Clear initial message if present
+                if (feedContainer.querySelector('.text-center')) {
+                    feedContainer.innerHTML = '';
+                }
+                
+                // Add new threat entry
+                const threatEntry = document.createElement('div');
+                threatEntry.className = 'alert alert-warning alert-dismissible fade show mb-3 fade-in glass-card';
+                threatEntry.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                <strong>${timestamp}</strong>
+                            </div>
+                            <div class="small mt-1">
+                                <span class="badge bg-danger me-2">HIGH</span>
+                                New threat detected from <span class="ip-address">192.168.1.${Math.floor(Math.random() * 255)}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="investigateThreat('${Math.floor(Math.random() * 1000)}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    </div>
+                `;
+                
+                feedContainer.prepend(threatEntry);
+                
+                // Keep only last 20 entries
+                const entries = feedContainer.querySelectorAll('.alert');
+                if (entries.length > 20) {
+                    entries[entries.length - 1].remove();
+                }
+            }
+
+            function updateRealTimeChart(highRisk, mediumRisk, lowRisk) {
+                const now = new Date().toLocaleTimeString();
+                
+                // Add new data point
+                chartData.labels.push(now);
+                chartData.datasets[0].data.push(highRisk);
+                chartData.datasets[1].data.push(mediumRisk);
+                chartData.datasets[2].data.push(lowRisk);
+                
+                // Keep only last 20 data points
+                if (chartData.labels.length > 20) {
+                    chartData.labels.shift();
+                    chartData.datasets[0].data.shift();
+                    chartData.datasets[1].data.shift();
+                    chartData.datasets[2].data.shift();
+                }
+                
+                realTimeChart.update();
+            }
+
+            function pauseLiveFeed() {
+                isPaused = !isPaused;
+                const button = document.getElementById('pauseButton');
+                if (isPaused) {
+                    button.innerHTML = '<i class="fas fa-play me-1"></i>Resume';
+                    button.className = 'btn btn-sm btn-outline-success';
+                    showNotification('Live feed paused', 'warning');
+                } else {
+                    button.innerHTML = '<i class="fas fa-pause me-1"></i>Pause';
+                    button.className = 'btn btn-sm btn-outline-success';
+                    showNotification('Live feed resumed', 'success');
+                }
+            }
+
+            function clearLiveFeed() {
+                document.getElementById('liveThreatFeed').innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                        <p class="mb-0">Feed cleared successfully</p>
+                    </div>
+                `;
+                showNotification('Live feed cleared', 'info');
+            }
+
+            function startMonitoring() {
+                isMonitoring = true;
+                isPaused = false;
+                document.getElementById('pauseButton').innerHTML = '<i class="fas fa-pause me-1"></i>Pause';
+                document.getElementById('pauseButton').className = 'btn btn-sm btn-outline-success';
+                document.getElementById('autoRefreshToggle').checked = true;
+                startLiveUpdates();
+                showNotification('Monitoring started', 'success');
+            }
+
+            function pauseMonitoring() {
+                isPaused = true;
+                pauseLiveFeed();
+                showNotification('Monitoring paused', 'warning');
+            }
+
+            function exportLiveData() {
+                // Implementation for exporting live data
+                showNotification('Live data export started', 'info');
+                setTimeout(() => {
+                    showNotification('Live data exported successfully', 'success');
+                }, 2000);
+            }
+
+            function resetMonitoring() {
+                // Reset charts and feed
+                chartData.labels = [];
+                chartData.datasets[0].data = [];
+                chartData.datasets[1].data = [];
+                chartData.datasets[2].data = [];
+                realTimeChart.update();
+                
+                document.getElementById('liveThreatFeed').innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                        <p class="mb-0">Waiting for live data...</p>
+                    </div>
+                `;
+                
+                showNotification('Monitoring view reset', 'info');
+            }
+
+            function setChartTimeRange(range) {
+                // Update active button
+                document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                showNotification(`Chart time range set to ${range}`, 'info');
+            }
+
+            function refreshNetworkMap() {
+                showNotification('Network map refreshed', 'info');
+                // In a real implementation, this would refresh the network visualization
+            }
+
+            function investigateThreat(threatId) {
+                showNotification(`Investigating threat ${threatId}`, 'info');
+                // In a real implementation, this would open a detailed threat analysis view
+            }
+
+            function saveSettings() {
+                const interval = document.getElementById('updateInterval').value;
+                const threshold = document.getElementById('threatThreshold').value;
+                const notifications = document.getElementById('alertNotification').value;
+                
+                showNotification(`Settings saved: Interval=${interval}s, Threshold=${threshold}, Notifications=${notifications}`, 'success');
+            }
+
+            function showNotification(message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    const container = document.createElement('div');
+                    container.id = 'toastContainer';
+                    container.style.position = 'fixed';
+                    container.style.top = '20px';
+                    container.style.right = '20px';
+                    container.style.zIndex = '9999';
+                    document.body.appendChild(container);
+                }
+                
+                const toastId = `toast-${Date.now()}`;
+                
+                const toastHTML = `
+                    <div id="${toastId}" class="toast fade show mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                        <div class="toast-header bg-${type} text-white glass-card">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                            <strong class="me-auto">ThreatX Notification</strong>
+                            <small class="text-white">Just now</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body glass-card">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHTML);
+                
+                const toastEl = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                
+                setTimeout(() => {
+                    if (toastEl) {
+                        toastEl.remove();
+                    }
+                }, 5000);
+            }
+        </script>
+    </div>
+</body>
+</html>

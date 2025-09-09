@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::content})}">
+<head>
+    <title>User Risk Profiles - ThreatX Dashboard</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <!-- Alert messages -->
+        <div class="container-fluid mt-3" th:if="${alertMessage}">
+            <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span th:text="${alertMessage}">Alert message</span>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="container-fluid mt-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+                <div>
+                    <h1 class="mb-2"><i class="fas fa-users me-2 text-primary"></i>User Risk Profiles</h1>
+                    <p class="mb-0 text-gray-300">Monitor and analyze user behavior for security risks</p>
+                </div>
+                <div class="mt-3 mt-md-0">
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary" onclick="refreshUserData()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                        <button type="button" class="btn btn-outline-success" onclick="exportUserData()">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                        <span class="badge bg-success pulse glass-card" th:classappend="${aiEngineOnline ? 'bg-success' : 'bg-danger'}">
+                            <i class="fas fa-robot me-1"></i>AI Engine: <i class="fas fa-circle me-1"></i><span th:text="${aiEngineOnline ? 'Online' : 'Offline'}">Status</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Statistics Row -->
+            <div class="row mb-4 g-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-danger shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                        High Risk Users
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="highRiskUsersCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-user-times fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-warning shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                        Medium Risk Users
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="mediumRiskUsersCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-user-clock fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-success shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                        Low Risk Users
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="lowRiskUsersCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-user-check fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-left-primary shadow h-100 pop-in glass-card">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col me-2">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                        Active Users
+                                    </div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="activeUsersCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-users fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row mb-4 g-4">
+                <!-- User Risk Distribution Chart -->
+                <div class="col-xl-6 col-lg-6">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">User Risk Distribution</h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="riskDistributionDropdown" data-bs-toggle="dropdown">
+                                    <i class="fas fa-filter me-1"></i>Filter
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a class="dropdown-item" href="#" onclick="filterRiskDistribution('all')">All Users</a>
+                                    <a class="dropdown-item" href="#" onclick="filterRiskDistribution('active')">Active Only</a>
+                                    <a class="dropdown-item" href="#" onclick="filterRiskDistribution('suspended')">Suspended Only</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-pie pt-4 pb-2">
+                                <canvas id="userRiskChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Activity Timeline -->
+                <div class="col-xl-6 col-lg-6">
+                    <div class="card shadow h-100 glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">User Activity Timeline</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="setActivityTimeRange('1h')">1H</button>
+                                <button class="btn btn-outline-primary active" onclick="setActivityTimeRange('24h')">24H</button>
+                                <button class="btn btn-outline-primary" onclick="setActivityTimeRange('7d')">7D</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-area">
+                                <canvas id="userActivityChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced User Search and Filter -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Advanced User Search & Filter</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="userSearch" class="form-label">User Search</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                        <input type="text" class="form-control" placeholder="Search users..." id="userSearch">
+                                        <button class="btn btn-outline-primary" type="button" onclick="searchUsers()">
+                                            <i class="fas fa-arrow-right"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="riskLevelFilter" class="form-label">Risk Level</label>
+                                    <select class="form-control" id="riskLevelFilter">
+                                        <option value="">All Risk Levels</option>
+                                        <option value="HIGH">High Risk</option>
+                                        <option value="MEDIUM">Medium Risk</option>
+                                        <option value="LOW">Low Risk</option>
+                                        <option value="NORMAL">Normal</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="statusFilter" class="form-label">User Status</label>
+                                    <select class="form-control" id="statusFilter">
+                                        <option value="">All Statuses</option>
+                                        <option value="Active">Active</option>
+                                        <option value="Suspended">Suspended</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12 d-flex justify-content-end">
+                                    <button class="btn btn-outline-secondary me-2" onclick="resetFilters()">
+                                        <i class="fas fa-redo me-1"></i>Reset
+                                    </button>
+                                    <button class="btn btn-primary" onclick="applyFilters()">
+                                        <i class="fas fa-filter me-1"></i>Apply Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow glass-card">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">User Risk Profiles</h6>
+                            <div>
+                                <button id="bulkActionsButton" class="btn btn-sm btn-primary d-none" onclick="showBulkActions()">
+                                    <i class="fas fa-tasks me-1"></i>Bulk Actions
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="usersTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleAllUsers()">
+                                                    <label class="form-check-label"></label>
+                                                </div>
+                                            </th>
+                                            <th>User ID</th>
+                                            <th>Risk Score</th>
+                                            <th>Risk Level</th>
+                                            <th>Total Alerts</th>
+                                            <th>Last Activity</th>
+                                            <th>Location</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usersTableBody">
+                                        <tr>
+                                            <td colspan="9" class="text-center">
+                                                <div class="loading-spinner"></div>
+                                                <span class="ms-2">Loading user data...</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Details Modal -->
+        <div class="modal fade" id="userDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content glass-card">
+                    <div class="modal-header">
+                        <h5 class="modal-title">User Risk Profile Details</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="userDetailsContent">
+                        <!-- User details will be loaded here -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-warning" onclick="requireMFA()">
+                            <i class="fas fa-shield-alt me-1"></i>Require MFA
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="suspendUser()">
+                            <i class="fas fa-ban me-1"></i>Suspend User
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Modal -->
+        <div class="modal fade" id="bulkActionsModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content glass-card">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Bulk Actions</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Select action for selected users (<span id="selectedUsersCount">0</span> selected):</p>
+                        <div class="list-group">
+                            <button type="button" class="list-group-item list-group-item-action glass-card" onclick="bulkAction('notify')">
+                                <i class="fas fa-bell me-2 text-info"></i>Send Security Notification
+                            </button>
+                            <button type="button" class="list-group-item list-group-item-action glass-card" onclick="bulkAction('require_mfa')">
+                                <i class="fas fa-shield-alt me-2 text-warning"></i>Require MFA
+                            </button>
+                            <button type="button" class="list-group-item list-group-item-action glass-card" onclick="bulkAction('reset_password')">
+                                <i class="fas fa-key me-2 text-primary"></i>Force Password Reset
+                            </button>
+                            <button type="button" class="list-group-item list-group-item-action text-danger glass-card" onclick="bulkAction('suspend')">
+                                <i class="fas fa-ban me-2"></i>Suspend Accounts
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let usersData = [];
+            let filteredUsers = [];
+            let selectedUsers = [];
+
+            document.addEventListener('DOMContentLoaded', function() {
+                initializeCharts();
+                loadUserData();
+                
+                // Add search on Enter key
+                document.getElementById('userSearch').addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        searchUsers();
+                    }
+                });
+                
+                // Add event listeners for advanced filters
+                document.getElementById('riskLevelFilter').addEventListener('change', function() {
+                    applyFilters();
+                });
+                
+                document.getElementById('statusFilter').addEventListener('change', function() {
+                    applyFilters();
+                });
+            });
+
+            function initializeCharts() {
+                // User Risk Distribution Chart
+                const riskCtx = document.getElementById('userRiskChart').getContext('2d');
+                new Chart(riskCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['High Risk', 'Medium Risk', 'Low Risk', 'Normal'],
+                        datasets: [{
+                            data: [5, 15, 25, 55],
+                            backgroundColor: [
+                                '#ef476f',
+                                '#ffd166',
+                                '#06d6a0',
+                                '#1b9aaa'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 15
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: {
+                                        size: 11
+                                    },
+                                    padding: 15
+                                }
+                            }
+                        },
+                        cutout: '60%',
+                        animation: {
+                            animateRotate: true,
+                            animateScale: true,
+                            duration: 1000
+                        }
+                    }
+                });
+
+                // User Activity Chart
+                const activityCtx = document.getElementById('userActivityChart').getContext('2d');
+                new Chart(activityCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: generateTimeLabels(),
+                        datasets: [{
+                            label: 'User Logins',
+                            data: generateRandomData(24, 0, 50),
+                            backgroundColor: 'rgba(27, 154, 170, 0.2)',
+                            borderColor: '#1b9aaa',
+                            borderWidth: 1
+                        }, {
+                            label: 'Risk Events',
+                            data: generateRandomData(24, 0, 10),
+                            backgroundColor: 'rgba(239, 71, 111, 0.2)',
+                            borderColor: '#ef476f',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#e2e8f0'
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeOutQuart'
+                        }
+                    }
+                });
+            }
+
+            function generateTimeLabels() {
+                const labels = [];
+                for (let i = 23; i >= 0; i--) {
+                    const date = new Date();
+                    date.setHours(date.getHours() - i);
+                    labels.push(date.getHours() + ':00');
+                }
+                return labels;
+            }
+
+            function generateRandomData(count, min, max) {
+                const data = [];
+                for (let i = 0; i < count; i++) {
+                    data.push(Math.floor(Math.random() * (max - min + 1)) + min);
+                }
+                return data;
+            }
+
+            function loadUserData() {
+                // Simulate loading user data
+                setTimeout(() => {
+                    usersData = generateSampleUsers();
+                    filteredUsers = [...usersData];
+                    updateUserStats();
+                    renderUsersTable();
+                }, 1000);
+            }
+
+            function generateSampleUsers() {
+                const users = [];
+                const userIds = ['alice.johnson', 'bob.smith', 'charlie.brown', 'diana.prince', 'eve.adams', 
+                               'frank.miller', 'grace.hopper', 'henry.ford', 'iris.watson', 'jack.sparrow'];
+                const locations = ['New York', 'London', 'Tokyo', 'Sydney', 'Berlin', 'Paris', 'Toronto', 'Mumbai'];
+                const riskLevels = ['HIGH', 'MEDIUM', 'LOW', 'NORMAL'];
+
+                userIds.forEach((userId, index) => {
+                    const riskScore = Math.random();
+                    let riskLevel;
+                    if (riskScore > 0.75) riskLevel = 'HIGH';
+                    else if (riskScore > 0.5) riskLevel = 'MEDIUM';
+                    else if (riskScore > 0.25) riskLevel = 'LOW';
+                    else riskLevel = 'NORMAL';
+
+                    const lastActivity = new Date();
+                    lastActivity.setHours(lastActivity.getHours() - Math.random() * 48);
+
+                    users.push({
+                        userId: userId,
+                        riskScore: riskScore.toFixed(3),
+                        riskLevel: riskLevel,
+                        totalAlerts: Math.floor(Math.random() * 20),
+                        lastActivity: lastActivity.toLocaleString(),
+                        location: locations[Math.floor(Math.random() * locations.length)],
+                        status: Math.random() > 0.1 ? 'Active' : 'Suspended'
+                    });
+                });
+
+                return users;
+            }
+
+            function updateUserStats() {
+                const counts = {
+                    HIGH: usersData.filter(u => u.riskLevel === 'HIGH').length,
+                    MEDIUM: usersData.filter(u => u.riskLevel === 'MEDIUM').length,
+                    LOW: usersData.filter(u => u.riskLevel === 'LOW').length,
+                    active: usersData.filter(u => u.status === 'Active').length
+                };
+
+                document.getElementById('highRiskUsersCount').textContent = counts.HIGH;
+                document.getElementById('mediumRiskUsersCount').textContent = counts.MEDIUM;
+                document.getElementById('lowRiskUsersCount').textContent = counts.LOW;
+                document.getElementById('activeUsersCount').textContent = counts.active;
+                
+                // Add animation to updated values
+                const elements = ['highRiskUsersCount', 'mediumRiskUsersCount', 'lowRiskUsersCount', 'activeUsersCount'];
+                elements.forEach(id => {
+                    const el = document.getElementById(id);
+                    el.classList.add('pop-in');
+                    setTimeout(() => el.classList.remove('pop-in'), 500);
+                });
+            }
+
+            function renderUsersTable() {
+                const tableBody = document.getElementById('usersTableBody');
+                
+                if (filteredUsers.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No users found</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = filteredUsers.map(user => `
+                    <tr class="fade-in">
+                        <td>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="${user.userId}" onchange="toggleUserSelection('${user.userId}')">
+                            </div>
+                        </td>
+                        <td><strong>${user.userId}</strong></td>
+                        <td>${user.riskScore}</td>
+                        <td><span class="badge bg-${getRiskBadgeClass(user.riskLevel)}">${user.riskLevel}</span></td>
+                        <td>${user.totalAlerts}</td>
+                        <td class="timestamp">${user.lastActivity}</td>
+                        <td>${user.location}</td>
+                        <td><span class="badge bg-${user.status === 'Active' ? 'success' : 'warning'}">${user.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="showUserDetails('${user.userId}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="requireMFA('${user.userId}')">
+                                <i class="fas fa-shield-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            function getRiskBadgeClass(riskLevel) {
+                switch(riskLevel) {
+                    case 'HIGH': return 'danger';
+                    case 'MEDIUM': return 'warning';
+                    case 'LOW': return 'info';
+                    case 'NORMAL': return 'success';
+                    default: return 'secondary';
+                }
+            }
+
+            function filterUsers(riskLevel) {
+                // Update button states
+                document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+
+                if (riskLevel === 'all') {
+                    filteredUsers = [...usersData];
+                } else {
+                    const level = riskLevel.toUpperCase();
+                    filteredUsers = usersData.filter(user => user.riskLevel === level);
+                }
+                
+                renderUsersTable();
+                showNotification(`Filtered to ${filteredUsers.length} users`, 'info');
+            }
+
+            function searchUsers() {
+                const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+                filteredUsers = usersData.filter(user => 
+                    user.userId.toLowerCase().includes(searchTerm) ||
+                    user.location.toLowerCase().includes(searchTerm)
+                );
+                renderUsersTable();
+                showNotification(`Found ${filteredUsers.length} matching users`, 'info');
+            }
+
+            function applyFilters() {
+                const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+                const riskLevel = document.getElementById('riskLevelFilter').value;
+                const status = document.getElementById('statusFilter').value;
+                
+                filteredUsers = usersData.filter(user => {
+                    // Apply search term filter
+                    const matchesSearch = !searchTerm || 
+                        user.userId.toLowerCase().includes(searchTerm) ||
+                        user.location.toLowerCase().includes(searchTerm);
+                    
+                    // Apply risk level filter
+                    const matchesRiskLevel = !riskLevel || user.riskLevel === riskLevel;
+                    
+                    // Apply status filter
+                    const matchesStatus = !status || user.status === status;
+                    
+                    return matchesSearch && matchesRiskLevel && matchesStatus;
+                });
+                
+                renderUsersTable();
+                showNotification(`Filters applied. Found ${filteredUsers.length} matching users`, 'info');
+            }
+
+            function resetFilters() {
+                document.getElementById('userSearch').value = '';
+                document.getElementById('riskLevelFilter').value = '';
+                document.getElementById('statusFilter').value = '';
+                filteredUsers = [...usersData];
+                renderUsersTable();
+                showNotification('Filters reset', 'info');
+            }
+
+            function toggleUserSelection(userId) {
+                const index = selectedUsers.indexOf(userId);
+                if (index > -1) {
+                    selectedUsers.splice(index, 1);
+                } else {
+                    selectedUsers.push(userId);
+                }
+
+                // Show/hide bulk actions button
+                const bulkButton = document.getElementById('bulkActionsButton');
+                if (selectedUsers.length > 0) {
+                    bulkButton.classList.remove('d-none');
+                    document.getElementById('selectedUsersCount').textContent = selectedUsers.length;
+                } else {
+                    bulkButton.classList.add('d-none');
+                }
+            }
+
+            function toggleAllUsers() {
+                const selectAllCheckbox = document.getElementById('selectAll');
+                const checkboxes = document.querySelectorAll('#usersTableBody input[type="checkbox"]');
+                selectedUsers = [];
+                
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllCheckbox.checked;
+                    if (selectAllCheckbox.checked) {
+                        selectedUsers.push(checkbox.value);
+                    }
+                });
+                
+                // Show/hide bulk actions button
+                const bulkButton = document.getElementById('bulkActionsButton');
+                if (selectedUsers.length > 0) {
+                    bulkButton.classList.remove('d-none');
+                    document.getElementById('selectedUsersCount').textContent = selectedUsers.length;
+                } else {
+                    bulkButton.classList.add('d-none');
+                }
+            }
+
+            function showUserDetails(userId) {
+                const user = usersData.find(u => u.userId === userId);
+                if (!user) return;
+
+                const modal = new bootstrap.Modal(document.getElementById('userDetailsModal'));
+                document.getElementById('userDetailsContent').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-user me-2 text-primary"></i>User Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>User ID:</strong> ${user.userId}</p>
+                                    <p class="mb-1"><strong>Risk Score:</strong> <span class="badge bg-${getRiskBadgeClass(user.riskLevel)}">${user.riskScore}</span></p>
+                                    <p class="mb-1"><strong>Risk Level:</strong> <span class="badge bg-${getRiskBadgeClass(user.riskLevel)}">${user.riskLevel}</span></p>
+                                    <p class="mb-1"><strong>Total Alerts:</strong> ${user.totalAlerts}</p>
+                                    <p class="mb-1"><strong>Status:</strong> <span class="badge bg-${user.status === 'Active' ? 'success' : 'warning'}">${user.status}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card glass-card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-history me-2 text-info"></i>Activity Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>Last Activity:</strong> ${user.lastActivity}</p>
+                                    <p class="mb-1"><strong>Location:</strong> ${user.location}</p>
+                                    <p class="mb-1"><strong>Login Count (24h):</strong> ${Math.floor(Math.random() * 10)}</p>
+                                    <p class="mb-1"><strong>Failed Logins:</strong> ${Math.floor(Math.random() * 5)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card glass-card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Recent Risk Events</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="list-group">
+                                        <div class="list-group-item bg-dark-theme-card mb-2 glass-card">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Unusual login location</h6>
+                                                <small class="text-muted">2 hours ago</small>
+                                            </div>
+                                            <p class="mb-1">Login detected from ${user.location}</p>
+                                            <small class="text-muted">Risk Score: 0.78</small>
+                                        </div>
+                                        <div class="list-group-item bg-dark-theme-card glass-card">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Multiple failed login attempts</h6>
+                                                <small class="text-muted">5 hours ago</small>
+                                            </div>
+                                            <p class="mb-1">3 consecutive failed login attempts detected</p>
+                                            <small class="text-muted">Risk Score: 0.65</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                modal.show();
+            }
+
+            function refreshUserData() {
+                document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="9" class="text-center"><div class="loading-spinner"></div><span class="ms-2">Loading user data...</span></td></tr>';
+                loadUserData();
+                showNotification('User data refreshed', 'success');
+            }
+
+            function exportUserData() {
+                // Implementation for exporting user data
+                showNotification('User data export started', 'info');
+                setTimeout(() => {
+                    showNotification('User data exported successfully', 'success');
+                }, 2000);
+            }
+
+            function requireMFA(userId) {
+                const user = userId || 'selected users';
+                showNotification(`MFA requirement enabled for ${user}`, 'success');
+            }
+
+            function suspendUser(userId) {
+                const user = userId || 'selected users';
+                if (confirm(`Suspend ${user}?`)) {
+                    showNotification(`${user} has been suspended`, 'warning');
+                }
+            }
+
+            function showBulkActions() {
+                document.getElementById('selectedUsersCount').textContent = selectedUsers.length;
+                const modal = new bootstrap.Modal(document.getElementById('bulkActionsModal'));
+                modal.show();
+            }
+
+            function bulkAction(action) {
+                if (selectedUsers.length === 0) {
+                    showNotification('No users selected', 'warning');
+                    return;
+                }
+                
+                const actionText = {
+                    'notify': 'Security notifications sent',
+                    'require_mfa': 'MFA requirements enabled',
+                    'reset_password': 'Password reset requests sent',
+                    'suspend': 'Accounts suspended'
+                };
+                
+                showNotification(`${actionText[action]} for ${selectedUsers.length} users`, 'success');
+                selectedUsers = [];
+                
+                // Reset UI
+                document.getElementById('bulkActionsButton').classList.add('d-none');
+                document.getElementById('selectAll').checked = false;
+                document.querySelectorAll('#usersTableBody input[type="checkbox"]').forEach(cb => cb.checked = false);
+                
+                bootstrap.Modal.getInstance(document.getElementById('bulkActionsModal')).hide();
+            }
+
+            function filterRiskDistribution(filter) {
+                showNotification(`Risk distribution filtered by ${filter}`, 'info');
+            }
+
+            function setActivityTimeRange(range) {
+                // Update active button
+                document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                showNotification(`Activity time range set to ${range}`, 'info');
+            }
+
+            function showNotification(message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    const container = document.createElement('div');
+                    container.id = 'toastContainer';
+                    container.style.position = 'fixed';
+                    container.style.top = '20px';
+                    container.style.right = '20px';
+                    container.style.zIndex = '9999';
+                    document.body.appendChild(container);
+                }
+                
+                const toastId = `toast-${Date.now()}`;
+                
+                const toastHTML = `
+                    <div id="${toastId}" class="toast fade show mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                        <div class="toast-header bg-${type} text-white glass-card">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                            <strong class="me-auto">ThreatX Notification</strong>
+                            <small class="text-white">Just now</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body glass-card">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHTML);
+                
+                const toastEl = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                
+                setTimeout(() => {
+                    if (toastEl) {
+                        toastEl.remove();
+                    }
+                }, 5000);
+            }
+        </script>
+    </div>
+</body>
+</html>
