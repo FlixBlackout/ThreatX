@@ -210,7 +210,7 @@ public class DashboardController {
     /**
      * Get threat statistics via AJAX
      */
-    @GetMapping("/api/threat-stats")
+    @GetMapping("/api/threat-statistics")
     @ResponseBody
     public Map<String, Object> getThreatStats(
             @RequestParam(defaultValue = "24h") String timeRange) {
@@ -224,6 +224,24 @@ public class DashboardController {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to get threat statistics: " + e.getMessage());
             return errorResponse;
+        }
+    }
+
+    /**
+     * Get suspicious IPs via AJAX
+     */
+    @GetMapping("/api/suspicious-ips")
+    @ResponseBody
+    public List<Map<String, Object>> getSuspiciousIps(
+            @RequestParam(defaultValue = "10") int limit) {
+        
+        logger.info("Getting suspicious IPs with limit: {}", limit);
+
+        try {
+            return aiEngineService.getSuspiciousIps(limit).block();
+        } catch (Exception e) {
+            logger.error("Error getting suspicious IPs", e);
+            return new ArrayList<>();
         }
     }
 

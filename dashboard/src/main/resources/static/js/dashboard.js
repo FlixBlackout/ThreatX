@@ -246,7 +246,7 @@ function loadDashboardData() {
 
 // Load threat statistics
 function loadThreatStatistics(timeRange = '24h') {
-    return fetch(`/api/threat-stats?range=${timeRange}`)
+    return fetch(`/api/threat-statistics?range=${timeRange}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -280,11 +280,49 @@ function loadSuspiciousIPs() {
 
 // Load recent threats
 function loadRecentThreats() {
-    return fetch('/api/recent-threats?limit=10')
+    return fetch('/api/threat-statistics?range=24h')
         .then(response => response.json())
         .then(data => {
-            if (Array.isArray(data)) {
-                updateRecentThreatsTable(data);
+            if (data && data.timeline_data) {
+                // Extract recent threats from timeline data
+                const recentThreats = [];
+                Object.keys(data.timeline_data).forEach(timestamp => {
+                    const threatData = data.timeline_data[timestamp];
+                    Object.keys(threatData).forEach(riskLevel => {
+                        if (threatData[riskLevel] > 0) {
+                            recentThreats.push({
+                                analysis_timestamp: timestamp,
+                                risk_level: riskLevel,
+                                threat_count: threatData[riskLevel]
+                            });
+                        }
+                    });
+                });
+                updateRecentThreatsTable(recentThreats);
+            } else if (data && data.threat_categories) {
+                // Handle the case where we get threat_categories instead of timeline_data
+                const recentThreats = [];
+                Object.keys(data.threat_categories).forEach(category => {
+                    if (data.threat_categories[category] > 0) {
+                        // Map categories to risk levels for display
+                        let riskLevel = 'UNKNOWN';
+                        if (category === 'DoS') {
+                            riskLevel = 'HIGH';
+                        } else if (category === 'Probe') {
+                            riskLevel = 'MEDIUM';
+                        } else if (category === 'Normal') {
+                            riskLevel = 'LOW';
+                        }
+                        
+                        recentThreats.push({
+                            analysis_timestamp: data.generated_at || new Date().toISOString(),
+                            risk_level: riskLevel,
+                            threat_count: data.threat_categories[category],
+                            threat_type: category
+                        });
+                    }
+                });
+                updateRecentThreatsTable(recentThreats);
             }
             return data;
         })
@@ -296,13 +334,16 @@ function loadRecentThreats() {
 
 // Update threat statistics display
 function updateThreatStatistics(data) {
-    const stats = data.threat_counts || {};
+    // Handle both formats - the new format from backend and the expected format
+    const stats = data.threat_counts || data.threat_categories || {};
+    const totalThreats = data.total_threats || data.recent_count || 0;
+    const suspiciousIpsCount = data.suspicious_ips_count || (data.suspicious_ips ? data.suspicious_ips.length : 0);
     
     // Update stat cards with animation
-    updateStatCard('totalThreats', data.total_threats || 0);
-    updateStatCard('highRiskThreats', stats.HIGH || 0);
+    updateStatCard('totalThreats', totalThreats);
+    updateStatCard('highRiskThreats', stats.HIGH || stats.DoS || 0);
     updateStatCard('mediumRiskThreats', stats.MEDIUM || 0);
-    updateStatCard('suspiciousIPsCount', data.suspicious_ips_count || 0);
+    updateStatCard('suspiciousIPsCount', suspiciousIpsCount);
     
     // Update timestamp
     updateElement('lastUpdated', new Date().toLocaleString());
@@ -329,8 +370,29 @@ function updateStatCard(cardId, value) {
 
 // Update threat charts
 function updateThreatCharts(data) {
-    updateThreatTimelineChart(data.timeline_data);
-    updateThreatTypesChart(data.top_threat_types);
+    // Handle both formats
+    const timelineData = data.timeline_data || {};
+    const threatTypes = data.top_threat_types || [];
+    
+    // If we don't have the expected format, try to convert from the backend format
+    if (!data.timeline_data && data.threat_categories) {
+        // Create a simple timeline data structure from threat categories
+        const timestamp = new Date().toISOString();
+        timelineData[timestamp] = data.threat_categories;
+    }
+    
+    if (!data.top_threat_types && data.threat_categories) {
+        // Convert threat categories to top threat types format
+        Object.keys(data.threat_categories).forEach(category => {
+            threatTypes.push({
+                threat_type: category,
+                count: data.threat_categories[category]
+            });
+        });
+    }
+    
+    updateThreatTimelineChart(timelineData);
+    updateThreatTypesChart(threatTypes);
 }
 
 // Update timeline chart
@@ -553,7 +615,7 @@ function updateRecentThreatsTable(threats) {
             </td>
             <td class="ip-address">${threat.ip_address || 'Unknown'}</td>
             <td>
-                ${threat.threat_types ? threat.threat_types.slice(0, 2).map(type => 
+                ${threat.threat_type || (threat.threat_types ? threat.threat_types.slice(0, 2).map(type => 
                     `<span class="threat-tag">${type}</span>`
                 ).join(' ') : 'Unknown'}
             </td>

@@ -26,17 +26,14 @@ public class ThreatAnalysis {
     @Column(name = "risk_level", nullable = false, length = 20)
     private String riskLevel;
 
-    @Column(name = "model_scores", columnDefinition = "jsonb")
+    @Column(name = "model_scores", columnDefinition = "TEXT")
     private String modelScores;
 
-    @ElementCollection
-    @CollectionTable(name = "threat_types", joinColumns = @JoinColumn(name = "threat_analysis_id"))
-    @Column(name = "threat_type")
+    // We'll handle threat types and recommendations separately
+    @Transient
     private List<String> threatTypes;
 
-    @ElementCollection
-    @CollectionTable(name = "recommendations", joinColumns = @JoinColumn(name = "threat_analysis_id"))
-    @Column(name = "recommendation")
+    @Transient
     private List<String> recommendations;
 
     @Column(name = "confidence")

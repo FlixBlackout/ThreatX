@@ -48,11 +48,11 @@ public class AiEngineService {
                 .uri(aiEngineBaseUrl + "/api/detect-threat")
                 .bodyValue(logData)
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout))
                 .doOnSuccess(result -> logger.debug("Threat detection response: {}", result))
                 .doOnError(error -> logger.error("Error detecting threat: {}", error.getMessage()))
-                .onErrorReturn(createErrorResponse("Failed to detect threat"));
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -62,13 +62,13 @@ public class AiEngineService {
         logger.debug("Getting user risk profile for: {}", userId);
 
         return webClient.get()
-                .uri(aiEngineBaseUrl + "/api/user-risk-profile/{userId}", userId)
+                .uri(aiEngineBaseUrl + "/api/user-risk-profile/" + userId)
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout))
                 .doOnSuccess(result -> logger.debug("User risk profile response: {}", result))
                 .doOnError(error -> logger.error("Error getting user risk profile: {}", error.getMessage()))
-                .onErrorReturn(createErrorResponse("Failed to get user risk profile"));
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -76,18 +76,33 @@ public class AiEngineService {
      */
     public Mono<Map<String, Object>> getThreatStatistics(String timeRange) {
         logger.debug("Getting threat statistics for time range: {}", timeRange);
-
+        
         return webClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(aiEngineBaseUrl + "/api/threat-statistics")
-                        .queryParam("range", timeRange)
-                        .build())
+                .uri(aiEngineBaseUrl + "/api/threat-statistics?format=json")
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout))
-                .doOnSuccess(result -> logger.debug("Threat statistics response: {}", result))
-                .doOnError(error -> logger.error("Error getting threat statistics: {}", error.getMessage()))
-                .onErrorReturn(createErrorResponse("Failed to get threat statistics"));
+                .doOnSuccess(result -> {
+                    logger.debug("Threat statistics response: {}", result);
+                    if (result != null) {
+                        logger.debug("Response keys: {}", result.keySet());
+                    }
+                })
+                .doOnError(error -> {
+                    logger.error("Error getting threat statistics: {}", error.getMessage(), error);
+                    if (error instanceof java.util.concurrent.TimeoutException) {
+                        logger.error("Timeout occurred while getting threat statistics");
+                    } else if (error instanceof org.springframework.web.reactive.function.client.WebClientRequestException) {
+                        logger.error("WebClient request exception: {}", error.getMessage());
+                    } else if (error instanceof org.springframework.web.reactive.function.client.WebClientResponseException) {
+                        WebClientResponseException wcre = (WebClientResponseException) error;
+                        logger.error("WebClient response exception - Status: {}, Response: {}", 
+                            wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                    } else {
+                        logger.error("Unexpected error type: {}", error.getClass().getName());
+                    }
+                })
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -97,17 +112,21 @@ public class AiEngineService {
         logger.debug("Getting suspicious IPs with limit: {}", limit);
 
         return webClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(aiEngineBaseUrl + "/api/suspicious-ips")
-                        .queryParam("limit", limit)
-                        .build())
+                .uri(aiEngineBaseUrl + "/api/suspicious-ips?limit=" + limit)
                 .retrieve()
-                .bodyToMono(List.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {})
                 .timeout(Duration.ofMillis(timeout))
                 .doOnSuccess(result -> logger.debug("Suspicious IPs response size: {}", 
                         result != null ? result.size() : 0))
-                .doOnError(error -> logger.error("Error getting suspicious IPs: {}", error.getMessage()))
-                .onErrorReturn(List.of());
+                .doOnError(error -> {
+                    logger.error("Error getting suspicious IPs: {}", error.getMessage());
+                    if (error instanceof WebClientResponseException) {
+                        WebClientResponseException wcre = (WebClientResponseException) error;
+                        logger.error("Response status: {}", wcre.getStatusCode());
+                        logger.error("Response body: {}", wcre.getResponseBodyAsString());
+                    }
+                })
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -119,11 +138,11 @@ public class AiEngineService {
         return webClient.post()
                 .uri(aiEngineBaseUrl + "/api/retrain-models")
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout * 2)) // Longer timeout for retraining
                 .doOnSuccess(result -> logger.info("Model retraining response: {}", result))
                 .doOnError(error -> logger.error("Error retraining models: {}", error.getMessage()))
-                .onErrorReturn(createErrorResponse("Failed to retrain models"));
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -133,13 +152,20 @@ public class AiEngineService {
         logger.debug("Checking AI Engine health");
 
         return webClient.get()
-                .uri(aiEngineBaseUrl + "/health")
+                .uri(aiEngineBaseUrl + "/health?format=json")
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(5000)) // Short timeout for health check
                 .doOnSuccess(result -> logger.debug("AI Engine health check response: {}", result))
-                .doOnError(error -> logger.warn("AI Engine health check failed: {}", error.getMessage()))
-                .onErrorReturn(createErrorResponse("AI Engine unavailable"));
+                .doOnError(error -> {
+                    logger.warn("AI Engine health check failed: {}", error.getMessage());
+                    if (error instanceof WebClientResponseException) {
+                        WebClientResponseException wcre = (WebClientResponseException) error;
+                        logger.error("Response status: {}", wcre.getStatusCode());
+                        logger.error("Response body: {}", wcre.getResponseBodyAsString());
+                    }
+                })
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -155,11 +181,11 @@ public class AiEngineService {
                 .uri(aiEngineBaseUrl + "/api/analyze-batch")
                 .bodyValue(request)
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout * 2)) // Longer timeout for batch processing
                 .doOnSuccess(result -> logger.debug("Batch processing response: {}", result))
                 .doOnError(error -> logger.error("Error processing log batch: {}", error.getMessage()))
-                .onErrorReturn(createErrorResponse("Failed to process log batch"));
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -171,11 +197,11 @@ public class AiEngineService {
         return webClient.get()
                 .uri(aiEngineBaseUrl + "/api/model-metrics")
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout))
                 .doOnSuccess(result -> logger.debug("Model metrics response: {}", result))
                 .doOnError(error -> logger.error("Error getting model metrics: {}", error.getMessage()))
-                .onErrorReturn(createErrorResponse("Failed to get model metrics"));
+                .onErrorResume(this::handleWebClientError);
     }
 
     /**
@@ -184,7 +210,10 @@ public class AiEngineService {
     public boolean isAiEngineAvailable() {
         try {
             Map<String, Object> health = checkHealth().block(Duration.ofSeconds(5));
-            return health != null && !"error".equals(health.get("status"));
+            // Check for both "healthy" status and absence of error status
+            return health != null && 
+                   (health.get("status") != null && 
+                    (health.get("status").equals("healthy") || !health.get("status").equals("error")));
         } catch (Exception e) {
             logger.warn("AI Engine availability check failed: {}", e.getMessage());
             return false;
@@ -220,5 +249,24 @@ public class AiEngineService {
             logger.error("Unexpected error communicating with AI Engine", error);
             return Mono.just(createErrorResponse("Unexpected error: " + error.getMessage()));
         }
+    }
+
+    /**
+     * Build URI with proper path concatenation
+     */
+    private String buildUri(String path, Object... uriVariables) {
+        // Ensure base URL doesn't end with slash and path starts with slash
+        String baseUrl = aiEngineBaseUrl;
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        
+        String uri = baseUrl + path;
+        logger.debug("Built URI: {} with variables: {}", uri, uriVariables);
+        return uri;
     }
 }

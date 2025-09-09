@@ -2331,6 +2331,13 @@ def detect_threat():
         result = detector.analyze(log_data)
         logger.info(f"Threat analysis: {result['risk_level']} risk detected")
         
+        # Store analysis result
+        threat_data.append({
+            'log_data': log_data,
+            'result': result,
+            'timestamp': datetime.utcnow()
+        })
+        
         return jsonify(result)
     
     except Exception as e:
