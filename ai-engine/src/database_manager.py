@@ -3,8 +3,26 @@ from psycopg2.extras import RealDictCursor
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union, TypedDict
 from contextlib import contextmanager
+
+# Define typed dictionaries for better type checking
+class LogEntryRow(TypedDict):
+    id: int
+    timestamp: datetime
+    ip_address: Optional[str]
+    user_id: Optional[str]
+    event_type: str
+    raw_data: Dict[str, Any]
+
+class ThreatAnalysisRow(TypedDict):
+    risk_level: str
+    count: int
+
+class TimelineDataRow(TypedDict):
+    hour: datetime
+    risk_level: str
+    count: int
 
 from config import Config
 
@@ -138,7 +156,15 @@ class DatabaseManager:
                     json.dumps(log_data)
                 ))
                 
-                log_entry_id = cursor.fetchone()['id']
+                # Handle potential None return from fetchone()
+                row = cursor.fetchone()
+                if row is None:
+                    logger.error("Failed to retrieve log entry ID after insertion")
+                    return None
+                    
+                # Convert to dict and access by key to satisfy Pyright
+                row_dict = dict(row)
+                log_entry_id = row_dict['id']
                 
                 # Insert threat analysis
                 cursor.execute("""
@@ -266,7 +292,13 @@ class DatabaseManager:
                     GROUP BY risk_level
                 """, (start_time,))
                 
-                threat_counts = {row['risk_level']: row['count'] for row in cursor.fetchall()}
+                threat_counts = {}
+                for row in cursor.fetchall():
+                    # Convert to dict to satisfy Pyright
+                    row_dict = dict(row)
+                    risk_level = row_dict['risk_level']
+                    count = row_dict['count']
+                    threat_counts[risk_level] = count
                 
                 # Timeline data (hourly aggregation)
                 cursor.execute("""
@@ -282,10 +314,16 @@ class DatabaseManager:
                 
                 timeline_data = {}
                 for row in cursor.fetchall():
-                    hour = row['hour'].isoformat()
+                    # Convert to dict to satisfy Pyright
+                    row_dict = dict(row)
+                    hour_raw = row_dict['hour']
+                    hour = hour_raw.isoformat() if hasattr(hour_raw, 'isoformat') else str(hour_raw)
+                    risk_level = row_dict['risk_level']
+                    count = row_dict['count']
+                    
                     if hour not in timeline_data:
                         timeline_data[hour] = {}
-                    timeline_data[hour][row['risk_level']] = row['count']
+                    timeline_data[hour][risk_level] = count
                 
                 # Top suspicious IPs
                 cursor.execute("""
@@ -296,7 +334,9 @@ class DatabaseManager:
                     LIMIT 10
                 """, (start_time,))
                 
-                top_suspicious_ips = [dict(row) for row in cursor.fetchall()]
+                top_suspicious_ips = []
+                for row in cursor.fetchall():
+                    top_suspicious_ips.append(dict(row))
                 
                 # Top threat types
                 cursor.execute("""
@@ -310,7 +350,9 @@ class DatabaseManager:
                     LIMIT 10
                 """, (start_time,))
                 
-                top_threat_types = [dict(row) for row in cursor.fetchall()]
+                top_threat_types = []
+                for row in cursor.fetchall():
+                    top_threat_types.append(dict(row))
                 
                 return {
                     'time_range': time_range,

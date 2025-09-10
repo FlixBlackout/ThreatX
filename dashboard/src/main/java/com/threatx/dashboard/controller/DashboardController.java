@@ -8,6 +8,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -39,11 +40,11 @@ public class DashboardController {
             if (aiEngineOnline) {
                 // Get threat statistics for the last 24 hours
                 Map<String, Object> stats = aiEngineService.getThreatStatistics("24h").block();
-                model.addAttribute("threatStats", stats);
+                model.addAttribute("threatStats", stats != null ? stats : new HashMap<>());
 
                 // Get recent suspicious IPs
                 List<Map<String, Object>> suspiciousIps = aiEngineService.getSuspiciousIps(10).block();
-                model.addAttribute("suspiciousIps", suspiciousIps);
+                model.addAttribute("suspiciousIps", suspiciousIps != null ? suspiciousIps : new ArrayList<>());
             } else {
                 logger.warn("AI Engine is not available");
                 model.addAttribute("alertMessage", "AI Engine is currently offline. Some features may not be available.");
@@ -69,8 +70,14 @@ public class DashboardController {
     public String monitoring(Model model) {
         logger.info("Loading monitoring page");
 
-        model.addAttribute("pageTitle", "Real-time Monitoring");
-        model.addAttribute("aiEngineOnline", aiEngineService.isAiEngineAvailable());
+        try {
+            model.addAttribute("pageTitle", "Real-time Monitoring");
+            model.addAttribute("aiEngineOnline", aiEngineService.isAiEngineAvailable());
+        } catch (Exception e) {
+            logger.error("Error preparing monitoring page", e);
+            model.addAttribute("alertMessage", "Error loading monitoring data: " + e.getMessage());
+            model.addAttribute("alertType", "danger");
+        }
 
         return "dashboard/monitoring";
     }
@@ -90,17 +97,22 @@ public class DashboardController {
         try {
             // Get threat statistics
             Map<String, Object> stats = aiEngineService.getThreatStatistics(timeRange).block();
-            model.addAttribute("threatStats", stats);
+            model.addAttribute("threatStats", stats != null ? stats : new HashMap<>());
             model.addAttribute("timeRange", timeRange);
 
             // Calculate pagination info
-            int totalThreats = stats != null ? (Integer) stats.getOrDefault("total_threats", 0) : 0;
+            int totalThreats = stats != null ? ((Number) stats.getOrDefault("total_threats", 0)).intValue() : 0;
             int totalPages = (int) Math.ceil((double) totalThreats / size);
             
             model.addAttribute("currentPage", page);
             model.addAttribute("totalPages", totalPages);
             model.addAttribute("pageSize", size);
 
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error getting threats data: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            model.addAttribute("alertMessage", "Error communicating with AI Engine: " + e.getStatusText());
+            model.addAttribute("alertType", "danger");
         } catch (Exception e) {
             logger.error("Error loading threats data", e);
             model.addAttribute("alertMessage", "Error loading threats data: " + e.getMessage());
@@ -117,8 +129,14 @@ public class DashboardController {
     public String users(Model model) {
         logger.info("Loading users page");
 
-        model.addAttribute("pageTitle", "User Risk Profiles");
-        model.addAttribute("aiEngineOnline", aiEngineService.isAiEngineAvailable());
+        try {
+            model.addAttribute("pageTitle", "User Risk Profiles");
+            model.addAttribute("aiEngineOnline", aiEngineService.isAiEngineAvailable());
+        } catch (Exception e) {
+            logger.error("Error preparing users page", e);
+            model.addAttribute("alertMessage", "Error loading user data: " + e.getMessage());
+            model.addAttribute("alertType", "danger");
+        }
 
         return "dashboard/users";
     }
@@ -135,9 +153,14 @@ public class DashboardController {
 
         try {
             List<Map<String, Object>> suspiciousIps = aiEngineService.getSuspiciousIps(limit).block();
-            model.addAttribute("suspiciousIps", suspiciousIps);
+            model.addAttribute("suspiciousIps", suspiciousIps != null ? suspiciousIps : new ArrayList<>());
             model.addAttribute("limit", limit);
 
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error getting IP data: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            model.addAttribute("alertMessage", "Error communicating with AI Engine: " + e.getStatusText());
+            model.addAttribute("alertType", "danger");
         } catch (Exception e) {
             logger.error("Error loading IP data", e);
             model.addAttribute("alertMessage", "Error loading IP data: " + e.getMessage());
@@ -154,8 +177,14 @@ public class DashboardController {
     public String settings(Model model) {
         logger.info("Loading settings page");
 
-        model.addAttribute("pageTitle", "Settings");
-        model.addAttribute("aiEngineOnline", aiEngineService.isAiEngineAvailable());
+        try {
+            model.addAttribute("pageTitle", "Settings");
+            model.addAttribute("aiEngineOnline", aiEngineService.isAiEngineAvailable());
+        } catch (Exception e) {
+            logger.error("Error preparing settings page", e);
+            model.addAttribute("alertMessage", "Error loading settings: " + e.getMessage());
+            model.addAttribute("alertType", "danger");
+        }
 
         return "dashboard/settings";
     }
@@ -168,6 +197,7 @@ public class DashboardController {
     public Map<String, Object> testDetection(@RequestBody Map<String, Object> testData) {
         logger.info("Testing threat detection with data: {}", testData);
 
+        Map<String, Object> response = new HashMap<>();
         try {
             // Add timestamp if not present
             if (!testData.containsKey("timestamp")) {
@@ -178,14 +208,19 @@ public class DashboardController {
             Map<String, Object> result = aiEngineService.detectThreat(testData).block();
             logger.info("Threat detection result: {}", result);
 
-            return result;
+            return result != null ? result : new HashMap<>();
 
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error in test detection: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            response.put("error", "AI Engine error: " + e.getStatusText());
+            response.put("status", "error");
+            return response;
         } catch (Exception e) {
             logger.error("Error in test detection", e);
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Test detection failed: " + e.getMessage());
-            errorResponse.put("status", "error");
-            return errorResponse;
+            response.put("error", "Test detection failed: " + e.getMessage());
+            response.put("status", "error");
+            return response;
         }
     }
 
@@ -198,7 +233,14 @@ public class DashboardController {
         logger.info("Getting user profile for: {}", userId);
 
         try {
-            return aiEngineService.getUserRiskProfile(userId).block();
+            Map<String, Object> result = aiEngineService.getUserRiskProfile(userId).block();
+            return result != null ? result : new HashMap<>();
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error getting user profile: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "AI Engine error: " + e.getStatusText());
+            return errorResponse;
         } catch (Exception e) {
             logger.error("Error getting user profile", e);
             Map<String, Object> errorResponse = new HashMap<>();
@@ -218,7 +260,14 @@ public class DashboardController {
         logger.info("Getting threat statistics for timeRange: {}", timeRange);
 
         try {
-            return aiEngineService.getThreatStatistics(timeRange).block();
+            Map<String, Object> result = aiEngineService.getThreatStatistics(timeRange).block();
+            return result != null ? result : new HashMap<>();
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error getting threat statistics: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "AI Engine error: " + e.getStatusText());
+            return errorResponse;
         } catch (Exception e) {
             logger.error("Error getting threat statistics", e);
             Map<String, Object> errorResponse = new HashMap<>();
@@ -232,13 +281,14 @@ public class DashboardController {
      */
     @GetMapping("/api/suspicious-ips")
     @ResponseBody
-    public List<Map<String, Object>> getSuspiciousIps(
+    public List<Map<String, Object>> getSuspiciousIpsAjax(
             @RequestParam(defaultValue = "10") int limit) {
         
         logger.info("Getting suspicious IPs with limit: {}", limit);
 
         try {
-            return aiEngineService.getSuspiciousIps(limit).block();
+            List<Map<String, Object>> result = aiEngineService.getSuspiciousIps(limit).block();
+            return result != null ? result : new ArrayList<>();
         } catch (Exception e) {
             logger.error("Error getting suspicious IPs", e);
             return new ArrayList<>();
@@ -255,12 +305,16 @@ public class DashboardController {
         try {
             Map<String, Object> result = aiEngineService.retrainModels().block();
             
-            if ("success".equals(result.get("status"))) {
+            if (result != null && "success".equals(result.get("status"))) {
                 redirectAttributes.addFlashAttribute("successMessage", "Model retraining initiated successfully");
             } else {
                 redirectAttributes.addFlashAttribute("errorMessage", "Failed to initiate model retraining");
             }
 
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error triggering model retraining: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Error communicating with AI Engine: " + e.getStatusText());
         } catch (Exception e) {
             logger.error("Error triggering model retraining", e);
             redirectAttributes.addFlashAttribute("errorMessage", "Error triggering model retraining: " + e.getMessage());
@@ -278,7 +332,14 @@ public class DashboardController {
         Map<String, Object> health = new HashMap<>();
         health.put("status", "healthy");
         health.put("timestamp", LocalDateTime.now().toString());
-        health.put("aiEngine", aiEngineService.isAiEngineAvailable() ? "online" : "offline");
+        
+        try {
+            health.put("aiEngine", aiEngineService.isAiEngineAvailable() ? "online" : "offline");
+        } catch (Exception e) {
+            health.put("aiEngine", "unknown");
+            logger.warn("Could not determine AI Engine status", e);
+        }
+        
         return health;
     }
 

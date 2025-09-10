@@ -28,9 +28,13 @@ try:
     enhanced_detector_path = os.path.join(ai_engine_src_path, 'enhanced_threat_detector.py')
     if os.path.exists(enhanced_detector_path):
         spec = importlib.util.spec_from_file_location("enhanced_threat_detector", enhanced_detector_path)
-        enhanced_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(enhanced_module)
-        EnhancedThreatDetector = enhanced_module.EnhancedThreatDetector
+        # Add null checks for both spec and spec.loader to fix the type error
+        if spec is not None and spec.loader is not None:
+            enhanced_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(enhanced_module)
+            EnhancedThreatDetector = enhanced_module.EnhancedThreatDetector
+        else:
+            EnhancedThreatDetector = None
     else:
         EnhancedThreatDetector = None
     
@@ -38,9 +42,13 @@ try:
     dataset_manager_path = os.path.join(ai_engine_src_path, 'dataset_manager.py')
     if os.path.exists(dataset_manager_path):
         spec = importlib.util.spec_from_file_location("dataset_manager", dataset_manager_path)
-        dataset_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(dataset_module)
-        DatasetManager = dataset_module.DatasetManager
+        # Add null checks for both spec and spec.loader to fix the type error
+        if spec is not None and spec.loader is not None:
+            dataset_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(dataset_module)
+            DatasetManager = dataset_module.DatasetManager
+        else:
+            DatasetManager = None
     else:
         DatasetManager = None
     

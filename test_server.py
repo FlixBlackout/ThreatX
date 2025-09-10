@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 ThreatX Test Server - Enhanced Version with Real Dataset Integration
@@ -2953,7 +2954,8 @@ def get_threat_statistics():
 @app.route('/api/suspicious-ips')
 def get_suspicious_ips():
     """Get suspicious IPs"""
-    return jsonify(suspicious_ips)
+    # Convert dictionary to list for proper JSON serialization
+    return jsonify(list(suspicious_ips.values()))
 
 @app.route('/api/recent-threats')
 def get_recent_threats():

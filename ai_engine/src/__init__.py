@@ -24,12 +24,16 @@ try:
     enhanced_detector_path = os.path.join(ai_engine_src_actual_path, 'enhanced_threat_detector.py')
     if os.path.exists(enhanced_detector_path):
         spec = importlib.util.spec_from_file_location("enhanced_threat_detector", enhanced_detector_path)
-        enhanced_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(enhanced_module)
-        
-        # Make the class available at module level
-        EnhancedThreatDetector = enhanced_module.EnhancedThreatDetector
-        globals()['EnhancedThreatDetector'] = EnhancedThreatDetector
+        # Add null check for both spec and spec.loader to fix the type error
+        if spec is not None and spec.loader is not None:
+            enhanced_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(enhanced_module)
+            
+            # Make the class available at module level
+            EnhancedThreatDetector = enhanced_module.EnhancedThreatDetector
+            globals()['EnhancedThreatDetector'] = EnhancedThreatDetector
+        else:
+            EnhancedThreatDetector = None
     else:
         EnhancedThreatDetector = None
     

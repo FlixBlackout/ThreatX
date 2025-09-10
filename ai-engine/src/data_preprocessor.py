@@ -85,14 +85,27 @@ class DataPreprocessor:
             features = self.process_log_entry(log_entry)
             processed_entries.append(features)
         
-        df = pd.DataFrame(processed_entries)
+        # Handle empty batch case
+        if not processed_entries:
+            # Create empty DataFrame with correct columns
+            df = pd.DataFrame({col: [] for col in self.feature_columns})
+        else:
+            # Create DataFrame ensuring it's always a DataFrame, not Series
+            df = pd.DataFrame(processed_entries)
+            
+            # Ensure all required columns are present
+            for col in self.feature_columns:
+                if col not in df.columns:
+                    df[col] = 0.0
         
-        # Ensure all required columns are present
-        for col in self.feature_columns:
-            if col not in df.columns:
-                df[col] = 0.0
-        
-        return df[self.feature_columns]
+        # Return as DataFrame with correct column order, ensuring it's always a DataFrame
+        result = df[self.feature_columns].copy()
+        # Ensure result is always a DataFrame (not Series) by checking type and converting if needed
+        if isinstance(result, pd.Series):
+            result = result.to_frame().T
+        elif not isinstance(result, pd.DataFrame):
+            result = pd.DataFrame(result)
+        return result
     
     def _parse_timestamp(self, timestamp) -> datetime:
         """Parse timestamp from various formats"""

@@ -1,6 +1,5 @@
 package com.threatx.dashboard.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +23,6 @@ public class AiEngineService {
     private static final Logger logger = LoggerFactory.getLogger(AiEngineService.class);
 
     private final WebClient webClient;
-    private final ObjectMapper objectMapper;
 
     @Value("${threatx.ai-engine.base-url}")
     private String aiEngineBaseUrl;
@@ -31,8 +30,7 @@ public class AiEngineService {
     @Value("${threatx.ai-engine.timeout:30000}")
     private long timeout;
 
-    public AiEngineService(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public AiEngineService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024))
                 .build();
@@ -45,7 +43,7 @@ public class AiEngineService {
         logger.debug("Sending threat detection request for log data: {}", logData);
 
         return webClient.post()
-                .uri(aiEngineBaseUrl + "/api/detect-threat")
+                .uri(buildUri("/api/detect-threat"))
                 .bodyValue(logData)
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
@@ -62,7 +60,7 @@ public class AiEngineService {
         logger.debug("Getting user risk profile for: {}", userId);
 
         return webClient.get()
-                .uri(aiEngineBaseUrl + "/api/user-risk-profile/" + userId)
+                .uri(buildUri("/api/user-risk-profile/{userId}"), userId)
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout))
@@ -78,7 +76,7 @@ public class AiEngineService {
         logger.debug("Getting threat statistics for time range: {}", timeRange);
         
         return webClient.get()
-                .uri(aiEngineBaseUrl + "/api/threat-statistics?format=json")
+                .uri(buildUri("/api/threat-statistics?range={timeRange}&format=json"), timeRange)
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout))
@@ -112,10 +110,14 @@ public class AiEngineService {
         logger.debug("Getting suspicious IPs with limit: {}", limit);
 
         return webClient.get()
-                .uri(aiEngineBaseUrl + "/api/suspicious-ips?limit=" + limit)
+                .uri(buildUri("/api/suspicious-ips?limit={limit}"), limit)
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {})
                 .timeout(Duration.ofMillis(timeout))
+                .onErrorResume(error -> {
+                    logger.error("Error getting suspicious IPs: {}", error.getMessage(), error);
+                    return Mono.just(new ArrayList<>());
+                })
                 .doOnSuccess(result -> logger.debug("Suspicious IPs response size: {}", 
                         result != null ? result.size() : 0))
                 .doOnError(error -> {
@@ -125,8 +127,7 @@ public class AiEngineService {
                         logger.error("Response status: {}", wcre.getStatusCode());
                         logger.error("Response body: {}", wcre.getResponseBodyAsString());
                     }
-                })
-                .onErrorResume(this::handleWebClientError);
+                });
     }
 
     /**
@@ -136,7 +137,7 @@ public class AiEngineService {
         logger.info("Triggering model retraining");
 
         return webClient.post()
-                .uri(aiEngineBaseUrl + "/api/retrain-models")
+                .uri(buildUri("/api/retrain-models"))
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout * 2)) // Longer timeout for retraining
@@ -152,7 +153,7 @@ public class AiEngineService {
         logger.debug("Checking AI Engine health");
 
         return webClient.get()
-                .uri(aiEngineBaseUrl + "/health?format=json")
+                .uri(buildUri("/health?format=json"))
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(5000)) // Short timeout for health check
@@ -178,7 +179,7 @@ public class AiEngineService {
         request.put("logs", logBatch);
 
         return webClient.post()
-                .uri(aiEngineBaseUrl + "/api/analyze-batch")
+                .uri(buildUri("/api/analyze-batch"))
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
@@ -195,7 +196,7 @@ public class AiEngineService {
         logger.debug("Getting model performance metrics");
 
         return webClient.get()
-                .uri(aiEngineBaseUrl + "/api/model-metrics")
+                .uri(buildUri("/api/model-metrics"))
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .timeout(Duration.ofMillis(timeout))
@@ -221,18 +222,7 @@ public class AiEngineService {
     }
 
     /**
-     * Create standardized error response
-     */
-    private Map<String, Object> createErrorResponse(String message) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("error", message);
-        error.put("status", "error");
-        error.put("timestamp", System.currentTimeMillis());
-        return error;
-    }
-
-    /**
-     * Handle WebClient exceptions and convert to meaningful error messages
+     * Handle WebClient exceptions and convert to meaningful error messages for Map responses
      */
     private Mono<Map<String, Object>> handleWebClientError(Throwable error) {
         if (error instanceof WebClientResponseException) {
@@ -249,6 +239,17 @@ public class AiEngineService {
             logger.error("Unexpected error communicating with AI Engine", error);
             return Mono.just(createErrorResponse("Unexpected error: " + error.getMessage()));
         }
+    }
+
+    /**
+     * Create standardized error response
+     */
+    private Map<String, Object> createErrorResponse(String message) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("error", message);
+        error.put("status", "error");
+        error.put("timestamp", System.currentTimeMillis());
+        return error;
     }
 
     /**

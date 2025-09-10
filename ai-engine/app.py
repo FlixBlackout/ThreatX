@@ -111,6 +111,33 @@ def retrain_models():
         logger.error(f"Error retraining models: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/dashboard-data', methods=['GET'])
+def dashboard_data():
+    """Get dashboard data combining threat statistics and suspicious IPs"""
+    try:
+        # Get threat statistics
+        threat_stats = db_manager.get_threat_statistics('24h')
+        
+        # Get suspicious IPs
+        suspicious_ips = db_manager.get_suspicious_ips(10)
+        
+        # Get recent threats (last 5)
+        recent_threats = db_manager.get_recent_threats(5)
+        
+        # Prepare response
+        response = {
+            'total_threats': threat_stats.get('total_count', 0),
+            'threat_counts': threat_stats.get('by_risk_level', {}),
+            'recent_threats': recent_threats,
+            'suspicious_ips': suspicious_ips,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error getting dashboard data: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Endpoint not found'}), 404

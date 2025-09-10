@@ -600,7 +600,7 @@ function updateRecentThreatsTable(threats) {
     const tableBody = document.querySelector('#recentThreatsTable tbody');
     if (!tableBody) return;
     
-    if (!threats || threats.length === 0) {
+    else if (!threats || threats.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No recent threats</td></tr>';
         return;
     }
@@ -617,11 +617,11 @@ function updateRecentThreatsTable(threats) {
             <td>
                 ${threat.threat_type || (threat.threat_types ? threat.threat_types.slice(0, 2).map(type => 
                     `<span class="threat-tag">${type}</span>`
-                ).join(' ') : 'Unknown'}
+                ).join(' ') : 'Unknown')}
             </td>
         </tr>
     `).join('');
-}
+            }
 
 // Get risk badge class
 function getRiskBadgeClass(riskLevel) {

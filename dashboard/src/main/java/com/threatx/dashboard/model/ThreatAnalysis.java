@@ -26,7 +26,7 @@ public class ThreatAnalysis {
     @Column(name = "risk_level", nullable = false, length = 20)
     private String riskLevel;
 
-    @Column(name = "model_scores", columnDefinition = "TEXT")
+    @Column(name = "model_scores", length = 10000)
     private String modelScores;
 
     // We'll handle threat types and recommendations separately

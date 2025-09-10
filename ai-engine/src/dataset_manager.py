@@ -185,7 +185,7 @@ class DatasetManager:
             df['is_attack'] = (df['attack_category'] != 'normal').astype(int)
             
             # Create risk scores based on attack category
-            risk_mapping = {
+            risk_mapping: Dict[str, float] = {
                 'normal': 0.1,
                 'probe': 0.3,
                 'dos': 0.7,
@@ -193,7 +193,7 @@ class DatasetManager:
                 'u2r': 0.9,
                 'unknown': 0.5
             }
-            df['risk_score'] = df['attack_category'].map(risk_mapping)
+            df['risk_score'] = df['attack_category'].map(lambda x: risk_mapping.get(x, 0.5))
             
             return df
             
@@ -245,7 +245,7 @@ class DatasetManager:
                 
                 # Create risk scores
                 unique_attacks = df[label_col].unique()
-                risk_mapping = {}
+                risk_mapping: Dict[str, float] = {}
                 for attack in unique_attacks:
                     if 'benign' in attack.lower():
                         risk_mapping[attack] = 0.1
@@ -258,7 +258,7 @@ class DatasetManager:
                     else:
                         risk_mapping[attack] = 0.6
                 
-                df['risk_score'] = df[label_col].map(risk_mapping)
+                df['risk_score'] = df[label_col].map(lambda x: risk_mapping.get(x, 0.6))
             
             return df
             

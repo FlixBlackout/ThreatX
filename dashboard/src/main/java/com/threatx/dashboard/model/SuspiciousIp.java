@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 public class SuspiciousIp {
 
     @Id
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
     @Column(name = "reputation_score")

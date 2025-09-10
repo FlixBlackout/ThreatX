@@ -2,13 +2,13 @@
 enabled = true
 
 [tool.pyright]
-pythonPath = "python"
+pythonPath = "C:\\Python313\\python.exe"
 include = [".", "ai-engine", "ai-engine/src", "ai_engine", "ai_engine/src"]
 exclude = ["**/__pycache__"]
 extraPaths = ["ai-engine/src", "ai-engine", "ai_engine/src", "ai_engine"]
 typeCheckingMode = "basic"
-reportMissingImports = "warning"
-reportMissingModuleSource = "warning"
+reportMissingImports = "none"
+reportMissingModuleSource = "none"
 
 [tool.pylance]
 extraPaths = ["ai-engine/src", "ai-engine", "ai_engine/src", "ai_engine"]

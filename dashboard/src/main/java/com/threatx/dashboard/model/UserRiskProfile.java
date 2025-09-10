@@ -23,7 +23,7 @@ public class UserRiskProfile {
     @Column(name = "last_suspicious_activity")
     private LocalDateTime lastSuspiciousActivity;
 
-    @Column(name = "risk_history", columnDefinition = "TEXT")
+    @Column(name = "risk_history", length = 10000)
     private String riskHistory;
 
     @Column(name = "created_at")

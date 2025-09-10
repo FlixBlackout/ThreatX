@@ -6,7 +6,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +37,14 @@ public class ApiController {
         
         try {
             List<Map<String, Object>> suspiciousIps = aiEngineService.getSuspiciousIps(limit).block();
-            return ResponseEntity.ok(suspiciousIps);
+            return ResponseEntity.ok(suspiciousIps != null ? suspiciousIps : new ArrayList<>());
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error getting suspicious IPs: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "AI Engine error: " + e.getStatusText());
+            errorResponse.put("status", "error");
+            return ResponseEntity.status(e.getStatusCode()).body(errorResponse);
         } catch (Exception e) {
             logger.error("Error getting suspicious IPs", e);
             Map<String, Object> errorResponse = new HashMap<>();
@@ -54,7 +63,14 @@ public class ApiController {
         
         try {
             Map<String, Object> healthStatus = aiEngineService.checkHealth().block();
-            return ResponseEntity.ok(healthStatus);
+            return ResponseEntity.ok(healthStatus != null ? healthStatus : new HashMap<>());
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error checking AI Engine health: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "AI Engine error: " + e.getStatusText());
+            errorResponse.put("status", "error");
+            return ResponseEntity.status(e.getStatusCode()).body(errorResponse);
         } catch (Exception e) {
             logger.error("Error checking AI Engine health", e);
             Map<String, Object> errorResponse = new HashMap<>();

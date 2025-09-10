@@ -57,15 +57,23 @@ class EnhancedThreatDetector:
         try:
             # Optimized models based on cybersecurity research
             self.models['isolation_forest'] = IsolationForest(
-                contamination=0.1, random_state=42, n_estimators=200
+                contamination="0.1",  # Direct float value instead of float(0.1)
+                random_state=42,
+                n_estimators=200
             )
             
             self.models['random_forest'] = RandomForestClassifier(
-                n_estimators=200, random_state=42, max_depth=15, class_weight='balanced'
+                n_estimators=200,
+                random_state=42,
+                max_depth=15,
+                class_weight='balanced'
             )
             
             self.models['gradient_boosting'] = GradientBoostingClassifier(
-                n_estimators=100, learning_rate=0.1, max_depth=6, random_state=42
+                n_estimators=100,
+                learning_rate=0.1,
+                max_depth=6,
+                random_state=42
             )
             
             logger.info("Enhanced ML models initialized")
@@ -106,10 +114,20 @@ class EnhancedThreatDetector:
                 X_train, y_binary, test_size=0.2, random_state=42, stratify=y_binary
             )
             
+            # Ensure proper numpy array types with explicit casting
+            X_train_split = np.array(X_train_split, dtype=np.float64)
+            X_val = np.array(X_val, dtype=np.float64)
+            y_train_split = np.array(y_train_split, dtype=np.int32)
+            y_val = np.array(y_val, dtype=np.int32)
+            
             # Fit scaler and transform data
             self.scaler.fit(X_train_split)
             X_train_scaled = self.scaler.transform(X_train_split)
             X_val_scaled = self.scaler.transform(X_val)
+            
+            # Ensure scaled data is proper numpy array with explicit casting
+            X_train_scaled = np.array(X_train_scaled, dtype=np.float64)
+            X_val_scaled = np.array(X_val_scaled, dtype=np.float64)
             
             # Train Isolation Forest (only on normal data)
             normal_data = X_train_scaled[y_train_split == 0]
@@ -119,7 +137,7 @@ class EnhancedThreatDetector:
             self.models['random_forest'].fit(X_train_scaled, y_train_split)
             self.models['gradient_boosting'].fit(X_train_scaled, y_train_split)
             
-            # Evaluate models
+            # Evaluate models with explicitly typed arrays
             self._evaluate_models(X_val_scaled, y_val)
             
             self.is_trained = True
@@ -137,6 +155,9 @@ class EnhancedThreatDetector:
             for model_name in ['random_forest', 'gradient_boosting']:
                 if model_name in self.models:
                     y_pred = self.models[model_name].predict(X_test)
+                    # Ensure y_pred and y_test are proper numpy arrays for comparison
+                    y_pred = np.asarray(y_pred)
+                    y_test = np.asarray(y_test)
                     logger.info(f"{model_name} accuracy: {np.mean(y_pred == y_test):.3f}")
         except Exception as e:
             logger.warning(f"Model evaluation failed: {e}")
@@ -155,6 +176,8 @@ class EnhancedThreatDetector:
             
             # Scale features and get predictions
             feature_scaled = self.scaler.transform([feature_vector])
+            # Ensure feature_scaled is a proper numpy array with explicit casting
+            feature_scaled = np.array(feature_scaled, dtype=np.float64)
             predictions = self._get_predictions(feature_scaled)
             
             # Combine predictions
@@ -597,7 +620,7 @@ class EnhancedThreatDetector:
     def _calculate_confidence(self, predictions: Dict[str, float]) -> float:
         if len(predictions) < 2: return 0.5
         scores = list(predictions.values())
-        agreement = 1.0 - np.std(scores)
+        agreement = 1.0 - float(np.std(scores))  # Explicitly convert to float
         return round(max(0.1, agreement), 3)
     
     def _save_models(self):

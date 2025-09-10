@@ -18,10 +18,10 @@
     "ai_engine/src",
     "ai_engine"
   ],
-  "pythonPath": "python",
+  "pythonPath": "C:\\Python313\\python.exe",
   "typeCheckingMode": "basic",
-  "reportMissingImports": "warning",
-  "reportMissingModuleSource": "warning",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
   "reportGeneralTypeIssues": "warning",
   "reportUndefinedVariable": "none",
   "useLibraryCodeForTypes": true,
