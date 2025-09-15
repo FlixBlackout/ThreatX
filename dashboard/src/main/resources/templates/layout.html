@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:fragment="layout">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -116,9 +116,11 @@
     </div>
 
     <!-- Main content area -->
-    <div layout:fragment="content">
-        <!-- Page content will be inserted here -->
-    </div>
+    <main class="container-fluid py-4">
+        <div layout:fragment="content">
+            <!-- Page content will be inserted here -->
+        </div>
+    </main>
 
     <!-- Enhanced Footer -->
     <footer class="bg-dark-secondary text-light mt-5 py-4 border-top border-dark glass-card">

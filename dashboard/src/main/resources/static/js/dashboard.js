@@ -101,8 +101,8 @@ function initializeDashboard() {
         card.classList.add('fade-in');
     });
     
-    // Load initial data
-    loadDashboardData();
+    // Note: Removed automatic data loading to prevent auto-scrolling
+    // Dashboard data is loaded via server-side rendering
     
     // Add pulse animation to status indicator
     const statusIndicator = document.querySelector('.status-indicator');
@@ -225,64 +225,93 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Load dashboard data
-function loadDashboardData() {
-    showLoadingState();
-    
-    Promise.all([
-        loadThreatStatistics('24h'),
-        loadSuspiciousIPs(),
-        loadRecentThreats()
-    ]).then(() => {
-        hideLoadingState();
-        console.log('Dashboard data loaded successfully');
-        showNotification('Dashboard updated successfully', 'success');
-    }).catch(error => {
-        hideLoadingState();
-        console.error('Error loading dashboard data:', error);
-        showNotification('Error loading dashboard data', 'danger');
-    });
+// Load dashboard data with simple refresh mechanism
+function loadDashboardData(retryCount = 0) {
+    console.log('Dashboard data refresh requested - relying on server-side rendering');
+    // Note: Removed automatic page reload to prevent auto-scrolling
+    // The dashboard data is already loaded via server-side rendering
 }
 
 // Load threat statistics
 function loadThreatStatistics(timeRange = '24h') {
-    return fetch(`/api/threat-statistics?range=${timeRange}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            updateThreatStatistics(data);
-            updateThreatCharts(data);
-            return data;
-        })
-        .catch(error => {
-            console.error('Error loading threat statistics:', error);
-            showNotification('Failed to load threat statistics', 'warning');
-        });
+    console.log('Attempting to load threat statistics...');
+    return fetch(`/api/ai-engine/threat-statistics?range=${timeRange}&format=json`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        console.log('Threat statistics fetch response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Threat statistics data received:', data);
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        updateThreatStatistics(data);
+        updateThreatCharts(data);
+        return data;
+    })
+    .catch(error => {
+        console.error('Error loading threat statistics:', error);
+        showNotification('Failed to load threat statistics', 'warning');
+        throw error;
+    });
 }
 
 // Load suspicious IPs
 function loadSuspiciousIPs() {
-    return fetch('/api/suspicious-ips?limit=10')
-        .then(response => response.json())
-        .then(data => {
-            if (Array.isArray(data)) {
-                updateSuspiciousIPsTable(data);
-            }
-            return data;
-        })
-        .catch(error => {
-            console.error('Error loading suspicious IPs:', error);
-            showNotification('Failed to load suspicious IPs', 'warning');
-        });
+    console.log('Attempting to load suspicious IPs...');
+    return fetch('/api/ai-engine/suspicious-ips?limit=10', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        console.log('Suspicious IPs fetch response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Suspicious IPs data received:', data);
+        if (Array.isArray(data)) {
+            updateSuspiciousIPsTable(data);
+        }
+        return data;
+    })
+    .catch(error => {
+        console.error('Error loading suspicious IPs:', error);
+        showNotification('Failed to load suspicious IPs', 'warning');
+        throw error;
+    });
 }
 
 // Load recent threats
 function loadRecentThreats() {
-    return fetch('/api/threat-statistics?range=24h')
-        .then(response => response.json())
-        .then(data => {
+    console.log('Attempting to load recent threats...');
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/ai-engine/threat-statistics?range=24h&format=json', true);
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                console.log('Recent threats XHR response:', xhr.status, xhr.statusText);
+                if (xhr.status === 200) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        console.log('Recent threats data received:', data);
             if (data && data.timeline_data) {
                 // Extract recent threats from timeline data
                 const recentThreats = [];
@@ -324,12 +353,30 @@ function loadRecentThreats() {
                 });
                 updateRecentThreatsTable(recentThreats);
             }
-            return data;
-        })
-        .catch(error => {
-            console.error('Error loading recent threats:', error);
-            showNotification('Failed to load recent threats', 'warning');
-        });
+            resolve(data);
+                    } catch (error) {
+                        console.error('Error parsing recent threats:', error);
+                        showNotification('Failed to parse recent threats', 'warning');
+                        reject(error);
+                    }
+                } else {
+                    const error = new Error(`HTTP error! status: ${xhr.status}`);
+                    console.error('Error loading recent threats:', error);
+                    showNotification('Failed to load recent threats', 'warning');
+                    reject(error);
+                }
+            }
+        };
+        
+        xhr.onerror = function() {
+            const error = new Error('Network error loading recent threats');
+            console.error('Network error loading recent threats:', error);
+            showNotification('Network error loading recent threats', 'warning');
+            reject(error);
+        };
+        
+        xhr.send();
+    });
 }
 
 // Update threat statistics display
@@ -585,7 +632,7 @@ function updateSuspiciousIPsTable(ips) {
         <tr class="fade-in">
             <td class="ip-address">${ip.ip_address || 'Unknown'}</td>
             <td>${ip.threat_count || 0}</td>
-            <td>${ip.country_code || 'Unknown'}</td>
+            <td>${ip.country || 'Unknown'}</td>
             <td>
                 <span class="badge ${ip.is_blocked ? 'bg-warning' : 'bg-danger'}">
                     ${ip.is_blocked ? 'Blocked' : 'Active'}
@@ -600,7 +647,7 @@ function updateRecentThreatsTable(threats) {
     const tableBody = document.querySelector('#recentThreatsTable tbody');
     if (!tableBody) return;
     
-    else if (!threats || threats.length === 0) {
+    if (!threats || threats.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No recent threats</td></tr>';
         return;
     }
@@ -672,9 +719,11 @@ function stopRealTimeUpdates() {
 
 // Refresh dashboard
 function refreshDashboard() {
-    showLoadingState();
-    loadDashboardData();
-    showNotification('Dashboard refreshed', 'info');
+    showNotification('Refreshing dashboard...', 'info');
+    // Reload page only when explicitly requested by user
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
 }
 
 // Show loading state

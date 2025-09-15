@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout}">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
 <head>
-    <title>IP Analysis - ThreatX Dashboard</title>
+    <title>IP Management - ThreatX Dashboard</title>
 </head>
 <body>
-    <div th:fragment="content">
+    <div layout:fragment="content">
         <!-- Alert messages -->
         <div class="container-fluid mt-3" th:if="${alertMessage}">
             <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">

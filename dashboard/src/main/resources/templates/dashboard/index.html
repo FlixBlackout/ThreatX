@@ -132,7 +132,7 @@
                                     Total Threats (24h)
                                 </div>
                                 <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalThreats"
-                                     th:text="${threatStats?.total_threats ?: 0}">0</div>
+                                     th:text="${threatStats != null and threatStats.containsKey('total_threats') ? threatStats.total_threats : 0}">0</div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
@@ -151,7 +151,7 @@
                                     High Risk Alerts
                                 </div>
                                 <div class="h5 mb-0 font-weight-bold text-gray-800" id="highRiskThreats"
-                                     th:text="${threatStats?.threat_counts?.HIGH ?: 0}">0</div>
+                                     th:text="${threatStats != null and threatStats.containsKey('threat_counts') and threatStats.threat_counts != null and threatStats.threat_counts.HIGH != null ? threatStats.threat_counts.HIGH : 0}">0</div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-skull-crossbones fa-2x text-gray-300"></i>
@@ -170,7 +170,7 @@
                                     Medium Risk Alerts
                                 </div>
                                 <div class="h5 mb-0 font-weight-bold text-gray-800" id="mediumRiskThreats"
-                                     th:text="${threatStats?.threat_counts?.MEDIUM ?: 0}">0</div>
+                                     th:text="${threatStats != null and threatStats.containsKey('threat_counts') and threatStats.threat_counts != null and threatStats.threat_counts.MEDIUM != null ? threatStats.threat_counts.MEDIUM : 0}">0</div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
@@ -268,14 +268,14 @@
                                 <tbody>
                                     <tr th:if="${suspiciousIps != null and not #lists.isEmpty(suspiciousIps)}" 
                                         th:each="ip : ${suspiciousIps}">
-                                        <td class="timestamp" th:text="${#dates.format(ip.last_seen, 'HH:mm:ss')}">14:30:00</td>
+                                        <td class="timestamp" th:text="${ip['last_seen'] ?: 'N/A'}">14:30:00</td>
                                         <td>
-                                            <span class="badge bg-danger" th:if="${ip.threat_count > 5}">HIGH</span>
-                                            <span class="badge bg-warning" th:unless="${ip.threat_count > 5}">MEDIUM</span>
+                                            <span class="badge bg-danger" th:if="${ip['threat_count'] != null and ip['threat_count'] > 5}">HIGH</span>
+                                            <span class="badge bg-warning" th:unless="${ip['threat_count'] != null and ip['threat_count'] > 5}">MEDIUM</span>
                                         </td>
-                                        <td class="ip-address" th:text="${ip.ip_address}">192.168.1.1</td>
+                                        <td class="ip-address" th:text="${ip['ip_address']}">192.168.1.1</td>
                                         <td>
-                                            <span class="threat-tag" th:text="${ip.country_code ?: 'Unknown'}">US</span>
+                                            <span class="threat-tag" th:text="${ip['threat_types'] != null and not #lists.isEmpty(ip['threat_types']) ? #strings.listJoin(ip['threat_types'], ', ') : 'Unknown'}">DoS</span>
                                         </td>
                                     </tr>
                                     <tr th:if="${suspiciousIps == null or #lists.isEmpty(suspiciousIps)}">
@@ -311,12 +311,12 @@
                                 <tbody>
                                     <tr th:if="${suspiciousIps != null and not #lists.isEmpty(suspiciousIps)}" 
                                         th:each="ip : ${suspiciousIps}">
-                                        <td class="ip-address" th:text="${ip.ip_address}">192.168.1.1</td>
-                                        <td th:text="${ip.threat_count}">5</td>
-                                        <td th:text="${ip.country_code ?: 'Unknown'}">US</td>
+                                        <td class="ip-address" th:text="${ip['ip_address']}">192.168.1.1</td>
+                                        <td th:text="${ip['threat_count']}">5</td>
+                                        <td th:text="${ip['country'] ?: 'Unknown'}">US</td>
                                         <td>
-                                            <span class="badge bg-warning" th:if="${ip.is_blocked}">Blocked</span>
-                                            <span class="badge bg-danger" th:unless="${ip.is_blocked}">Active</span>
+                                            <span class="badge bg-warning" th:if="${ip['is_blocked']}">Blocked</span>
+                                            <span class="badge bg-danger" th:unless="${ip['is_blocked']}">Active</span>
                                         </td>
                                     </tr>
                                     <tr th:if="${suspiciousIps == null or #lists.isEmpty(suspiciousIps)}">
@@ -625,44 +625,13 @@
         updateCurrentTime();
         setInterval(updateCurrentTime, 1000);
 
-        // Auto-refresh dashboard data every 30 seconds
-        let refreshInterval = setInterval(function() {
-            // Add visual indication of refresh
-            const refreshBtn = document.getElementById('refreshButton');
-            const originalHTML = refreshBtn.innerHTML;
-            refreshBtn.innerHTML = '<i class="fas fa-sync fa-spin me-2"></i>Refreshing...';
-            
-            setTimeout(() => {
-                refreshBtn.innerHTML = originalHTML;
-            }, 1000);
-        }, 30000);
-
-        // Handle auto-refresh toggle
-        document.getElementById('autoRefreshToggle').addEventListener('change', function() {
-            if (this.checked) {
-                refreshInterval = setInterval(function() {
-                    const refreshBtn = document.getElementById('refreshButton');
-                    const originalHTML = refreshBtn.innerHTML;
-                    refreshBtn.innerHTML = '<i class="fas fa-sync fa-spin me-2"></i>Refreshing...';
-                    
-                    setTimeout(() => {
-                        refreshBtn.innerHTML = originalHTML;
-                    }, 1000);
-                }, 30000);
-            } else {
-                clearInterval(refreshInterval);
-            }
-        });
-
         // Handle refresh button click
         document.getElementById('refreshButton').addEventListener('click', function() {
-            const originalHTML = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-sync fa-spin me-2"></i>Refreshing...';
-            
-            setTimeout(() => {
-                this.innerHTML = originalHTML;
+            if (typeof refreshDashboard === 'function') {
+                refreshDashboard();
+            } else {
                 location.reload();
-            }, 1000);
+            }
         });
     </script>
 </body>

@@ -55,6 +55,35 @@ public class ApiController {
     }
 
     /**
+     * Get threat statistics from AI Engine
+     */
+    @GetMapping("/threat-statistics")
+    public ResponseEntity<?> getThreatStatistics(
+            @RequestParam(defaultValue = "24h") String range,
+            @RequestParam(defaultValue = "json") String format) {
+        
+        logger.info("API request for threat statistics with range: {} and format: {}", range, format);
+        
+        try {
+            Map<String, Object> threatStats = aiEngineService.getThreatStatistics(range).block();
+            return ResponseEntity.ok(threatStats != null ? threatStats : new HashMap<>());
+        } catch (WebClientResponseException e) {
+            logger.error("WebClient error getting threat statistics: Status={}, Response={}", 
+                e.getStatusCode(), e.getResponseBodyAsString(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "AI Engine error: " + e.getStatusText());
+            errorResponse.put("status", "error");
+            return ResponseEntity.status(e.getStatusCode()).body(errorResponse);
+        } catch (Exception e) {
+            logger.error("Error getting threat statistics", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to get threat statistics: " + e.getMessage());
+            errorResponse.put("status", "error");
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
      * Check AI Engine health status
      */
     @GetMapping("/health")

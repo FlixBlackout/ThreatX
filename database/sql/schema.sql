@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS threat_intelligence (
     is_active BOOLEAN DEFAULT TRUE,
     tags TEXT[],
     description TEXT,
-    references TEXT[],
+    reference_urls TEXT[],
     
     UNIQUE(indicator_type, indicator_value, source)
 );

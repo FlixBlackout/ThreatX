@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout}">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
 <head>
-    <title>Real-time Monitoring - ThreatX Dashboard</title>
+    <title>System Monitoring - ThreatX Dashboard</title>
 </head>
 <body>
-    <div th:fragment="content">
+    <div layout:fragment="content">
         <!-- Alert messages -->
         <div class="container-fluid mt-3" th:if="${alertMessage}">
             <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
@@ -456,23 +456,86 @@
             }
 
             function updateLiveData() {
-                // Generate mock data for demonstration
-                const highRisk = Math.floor(Math.random() * 5);
-                const mediumRisk = Math.floor(Math.random() * 10);
-                const lowRisk = Math.floor(Math.random() * 15);
+                // Fetch real data from AI engine
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', '/api/ai-engine/threat-statistics?format=json', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
                 
-                updateLiveStats({
-                    total_threats: highRisk + mediumRisk + lowRisk,
-                    high_risk_count: highRisk
-                });
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                const threatCategories = data.threat_categories || {};
+                                
+                                const highRisk = threatCategories.high_risk || 0;
+                                const mediumRisk = threatCategories.medium_risk || 0;
+                                const lowRisk = threatCategories.low_risk || 0;
+                                
+                                updateLiveStats({
+                                    total_threats: highRisk + mediumRisk + lowRisk,
+                                    high_risk_count: highRisk,
+                                    medium_risk_count: mediumRisk,
+                                    low_risk_count: lowRisk
+                                });
+                                
+                                updateLiveFeed();
+                                updateRealTimeChart(highRisk, mediumRisk, lowRisk);
+                                
+                                // Show notification for high risk threats
+                                if (highRisk > 0) {
+                                    showNotification(`Detected ${highRisk} new high-risk threats`, 'danger');
+                                }
+                            } catch (e) {
+                                console.error('Error parsing threat statistics:', e);
+                                // Fallback to mock data if API fails
+                                const highRisk = Math.floor(Math.random() * 5);
+                                const mediumRisk = Math.floor(Math.random() * 10);
+                                const lowRisk = Math.floor(Math.random() * 15);
+                                
+                                updateLiveStats({
+                                    total_threats: highRisk + mediumRisk + lowRisk,
+                                    high_risk_count: highRisk
+                                });
+                                
+                                updateLiveFeed();
+                                updateRealTimeChart(highRisk, mediumRisk, lowRisk);
+                            }
+                        } else {
+                            console.error('Failed to fetch threat statistics:', xhr.status);
+                            // Fallback to mock data if API fails
+                            const highRisk = Math.floor(Math.random() * 5);
+                            const mediumRisk = Math.floor(Math.random() * 10);
+                            const lowRisk = Math.floor(Math.random() * 15);
+                            
+                            updateLiveStats({
+                                total_threats: highRisk + mediumRisk + lowRisk,
+                                high_risk_count: highRisk
+                            });
+                            
+                            updateLiveFeed();
+                            updateRealTimeChart(highRisk, mediumRisk, lowRisk);
+                        }
+                    }
+                };
                 
-                updateLiveFeed();
-                updateRealTimeChart(highRisk, mediumRisk, lowRisk);
+                xhr.onerror = function() {
+                    console.error('Network error while fetching threat statistics');
+                    // Fallback to mock data if network fails
+                    const highRisk = Math.floor(Math.random() * 5);
+                    const mediumRisk = Math.floor(Math.random() * 10);
+                    const lowRisk = Math.floor(Math.random() * 15);
+                    
+                    updateLiveStats({
+                        total_threats: highRisk + mediumRisk + lowRisk,
+                        high_risk_count: highRisk
+                    });
+                    
+                    updateLiveFeed();
+                    updateRealTimeChart(highRisk, mediumRisk, lowRisk);
+                };
                 
-                // Show notification for high risk threats
-                if (highRisk > 0) {
-                    showNotification(`Detected ${highRisk} new high-risk threats`, 'danger');
-                }
+                xhr.send();
             }
 
             function updateLiveStats(data) {

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout}">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
 <head>
     <title>Threat Analysis - ThreatX Dashboard</title>
 </head>
 <body>
-    <div th:fragment="content">
+    <div layout:fragment="content">
         <!-- Alert messages -->
         <div class="container-fluid mt-3" th:if="${alertMessage}">
             <div class="alert alert-dismissible fade show rounded-pill glass-card" th:classappend="'alert-' + ${alertType}">
@@ -58,7 +58,7 @@
                                         High Risk Threats
                                     </div>
                                     <div class="h5 mb-0 font-weight-bold text-gray-800" 
-                                         th:text="${threatStats?.threat_counts?.HIGH ?: 0}">0</div>
+                                         th:text="${threatStats != null and threatStats.containsKey('threat_counts') and threatStats.threat_counts != null ? (threatStats.threat_counts.HIGH ?: 0) : 0}">0</div>
                                 </div>
                                 <div class="col-auto">
                                     <i class="fas fa-skull-crossbones fa-2x text-gray-300"></i>
@@ -77,7 +77,7 @@
                                         Medium Risk Threats
                                     </div>
                                     <div class="h5 mb-0 font-weight-bold text-gray-800" 
-                                         th:text="${threatStats?.threat_counts?.MEDIUM ?: 0}">0</div>
+                                         th:text="${threatStats != null and threatStats.containsKey('threat_counts') and threatStats.threat_counts != null ? (threatStats.threat_counts.MEDIUM ?: 0) : 0}">0</div>
                                 </div>
                                 <div class="col-auto">
                                     <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
@@ -96,7 +96,7 @@
                                         Low Risk Threats
                                     </div>
                                     <div class="h5 mb-0 font-weight-bold text-gray-800" 
-                                         th:text="${threatStats?.threat_counts?.LOW ?: 0}">0</div>
+                                         th:text="${threatStats != null and threatStats.threat_counts != null and threatStats.threat_counts.LOW != null ? threatStats.threat_counts.LOW : 0}">0</div>
                                 </div>
                                 <div class="col-auto">
                                     <i class="fas fa-info-circle fa-2x text-gray-300"></i>
@@ -115,7 +115,7 @@
                                         Total Threats
                                     </div>
                                     <div class="h5 mb-0 font-weight-bold text-gray-800" 
-                                         th:text="${threatStats?.total_threats ?: 0}">0</div>
+                                         th:text="${threatStats != null and threatStats.containsKey('total_threats') ? threatStats.total_threats : 0}">0</div>
                                 </div>
                                 <div class="col-auto">
                                     <i class="fas fa-shield-alt fa-2x text-gray-300"></i>

@@ -38,15 +38,31 @@ public class DashboardController {
             model.addAttribute("aiEngineOnline", aiEngineOnline);
 
             if (aiEngineOnline) {
-                // Get threat statistics for the last 24 hours
-                Map<String, Object> stats = aiEngineService.getThreatStatistics("24h").block();
-                model.addAttribute("threatStats", stats != null ? stats : new HashMap<>());
+                try {
+                    // Get threat statistics for the last 24 hours with timeout
+                    Map<String, Object> stats = aiEngineService.getThreatStatistics("24h")
+                            .timeout(java.time.Duration.ofSeconds(5))
+                            .onErrorReturn(new HashMap<>())
+                            .block();
+                    model.addAttribute("threatStats", stats != null ? stats : new HashMap<>());
 
-                // Get recent suspicious IPs
-                List<Map<String, Object>> suspiciousIps = aiEngineService.getSuspiciousIps(10).block();
-                model.addAttribute("suspiciousIps", suspiciousIps != null ? suspiciousIps : new ArrayList<>());
+                    // Get recent suspicious IPs with timeout
+                    List<Map<String, Object>> suspiciousIps = aiEngineService.getSuspiciousIps(10)
+                            .timeout(java.time.Duration.ofSeconds(5))
+                            .onErrorReturn(new ArrayList<>())
+                            .block();
+                    model.addAttribute("suspiciousIps", suspiciousIps != null ? suspiciousIps : new ArrayList<>());
+                } catch (Exception apiException) {
+                    logger.warn("API call failed, using default values: {}", apiException.getMessage());
+                    model.addAttribute("threatStats", new HashMap<>());
+                    model.addAttribute("suspiciousIps", new ArrayList<>());
+                    model.addAttribute("alertMessage", "Some data may be unavailable due to API timeout.");
+                    model.addAttribute("alertType", "warning");
+                }
             } else {
                 logger.warn("AI Engine is not available");
+                model.addAttribute("threatStats", new HashMap<>());
+                model.addAttribute("suspiciousIps", new ArrayList<>());
                 model.addAttribute("alertMessage", "AI Engine is currently offline. Some features may not be available.");
                 model.addAttribute("alertType", "warning");
             }
@@ -56,6 +72,8 @@ public class DashboardController {
 
         } catch (Exception e) {
             logger.error("Error loading dashboard data", e);
+            model.addAttribute("threatStats", new HashMap<>());
+            model.addAttribute("suspiciousIps", new ArrayList<>());
             model.addAttribute("alertMessage", "Error loading dashboard data: " + e.getMessage());
             model.addAttribute("alertType", "danger");
         }
@@ -95,8 +113,11 @@ public class DashboardController {
         logger.info("Loading threats page with timeRange: {}, page: {}, size: {}", timeRange, page, size);
 
         try {
-            // Get threat statistics
-            Map<String, Object> stats = aiEngineService.getThreatStatistics(timeRange).block();
+            // Get threat statistics with timeout
+            Map<String, Object> stats = aiEngineService.getThreatStatistics(timeRange)
+                    .timeout(java.time.Duration.ofSeconds(5))
+                    .onErrorReturn(new HashMap<>())
+                    .block();
             model.addAttribute("threatStats", stats != null ? stats : new HashMap<>());
             model.addAttribute("timeRange", timeRange);
 
@@ -111,10 +132,20 @@ public class DashboardController {
         } catch (WebClientResponseException e) {
             logger.error("WebClient error getting threats data: Status={}, Response={}", 
                 e.getStatusCode(), e.getResponseBodyAsString(), e);
+            model.addAttribute("threatStats", new HashMap<>());
+            model.addAttribute("timeRange", timeRange);
+            model.addAttribute("currentPage", page);
+            model.addAttribute("totalPages", 0);
+            model.addAttribute("pageSize", size);
             model.addAttribute("alertMessage", "Error communicating with AI Engine: " + e.getStatusText());
             model.addAttribute("alertType", "danger");
         } catch (Exception e) {
             logger.error("Error loading threats data", e);
+            model.addAttribute("threatStats", new HashMap<>());
+            model.addAttribute("timeRange", timeRange);
+            model.addAttribute("currentPage", page);
+            model.addAttribute("totalPages", 0);
+            model.addAttribute("pageSize", size);
             model.addAttribute("alertMessage", "Error loading threats data: " + e.getMessage());
             model.addAttribute("alertType", "danger");
         }
