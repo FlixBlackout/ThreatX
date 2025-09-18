@@ -136,10 +136,22 @@ class AdvancedThreatDetector:
         try:
             # Use enhanced detector if available
             if self.use_enhanced and hasattr(self, 'enhanced_detector'):
-                return self.enhanced_detector.analyze(log_data)
+                result = self.enhanced_detector.analyze(log_data)
+            else:
+                # Fallback to enhanced rule-based analysis
+                result = self._enhanced_rule_analysis(log_data)
             
-            # Fallback to enhanced rule-based analysis
-            return self._enhanced_rule_analysis(log_data)
+            # Ensure profiles are updated regardless of which detector was used
+            user_id = log_data.get('user_id', '')
+            ip_address = log_data.get('ip_address', '')
+            
+            if user_id and result.get('risk_level') in ['HIGH', 'MEDIUM']:
+                self._update_user_profile(user_id, result)
+            
+            if result.get('risk_level') in ['HIGH', 'MEDIUM']:
+                self._update_suspicious_ip(ip_address, result)
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error in threat analysis: {e}")
@@ -282,13 +294,6 @@ class AdvancedThreatDetector:
             'result': result,
             'timestamp': datetime.utcnow()
         })
-        
-        # Update profiles
-        if user_id:
-            self._update_user_profile(user_id, result)
-        
-        if risk_level in ['HIGH', 'MEDIUM']:
-            self._update_suspicious_ip(ip_address, result)
         
         return result
     
@@ -450,6 +455,7 @@ class AdvancedThreatDetector:
     
     def _update_user_profile(self, user_id: str, result: Dict[str, Any]):
         """Update user risk profile"""
+        global user_profiles
         if user_id not in user_profiles:
             user_profiles[user_id] = {
                 'user_id': user_id,
@@ -476,6 +482,7 @@ class AdvancedThreatDetector:
     
     def _update_suspicious_ip(self, ip_address: str, result: Dict[str, Any]):
         """Update suspicious IP tracking"""
+        global suspicious_ips
         if ip_address not in suspicious_ips:
             suspicious_ips[ip_address] = {
                 'ip_address': ip_address,
@@ -1495,17 +1502,23 @@ def home():
                                 </div>
                             </div>
                             <div class="row g-3 mt-3">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <a href="/health" class="btn btn-info w-100">
                                         <i class="fas fa-heartbeat me-2"></i>
                                         System Health Check
                                     </a>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <a href="/api/threat-statistics" class="btn btn-secondary w-100">
                                         <i class="fas fa-chart-bar me-2"></i>
                                         View Statistics
                                     </a>
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-primary w-100" onclick="refreshDashboard()">
+                                        <i class="fas fa-sync-alt me-2"></i>
+                                        Refresh Dashboard
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1517,8 +1530,6 @@ def home():
     
     <!-- Enhanced JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Fetch API polyfill for older browsers -->
-    <script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.20/fetch.min.js"></script>
     
     <script>
         // Enhanced fetch polyfill and compatibility check
@@ -1803,12 +1814,25 @@ def home():
         
         // Auto-refresh dashboard data
         function loadDashboardData() {
+            console.log('Loading dashboard data...');
             fetch('/api/dashboard-data')
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response received:', response);
+                    if (!response.ok) {
+                        throw new Error('HTTP error! status: ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    const profiles = data.user_profiles || {};
-                    const ips = data.suspicious_ips || {};
-                    const stats = data.stats || {};
+                    console.log('Dashboard data received:', data);
+                    const profiles = data.user_profiles || [];
+                    const ips = data.suspicious_ips || [];
+                    const stats = data.stats || [];
+                    const recentThreats = data.recent_threats || [];
+                    
+                    console.log('Profiles:', profiles, 'IPs:', ips, 'Stats:', stats, 'Recent threats:', recentThreats);
+                    console.log('Profiles object keys:', Object.keys(profiles));
+                    console.log('IPs object keys:', Object.keys(ips));
                     
                     // Update stats
                     document.getElementById('totalThreats').textContent = stats.total_threats || 0;
@@ -1817,21 +1841,22 @@ def home():
                     
                     // Update recent threats
                     const recentContainer = document.getElementById('recentThreats');
-                    const recentThreats = data.recent_threats || [];
                     
                     if (recentThreats.length === 0) {
                         recentContainer.innerHTML = '<div class="text-center py-3"><i class="fas fa-shield-check fa-2x text-success mb-2"></i><p class="text-secondary">No threats detected</p></div>';
                     } else {
                         const html = recentThreats.slice(0, 3).map(threat => {
-                            const riskClass = threat.result.risk_level.toLowerCase();
+                            const riskLevel = threat.result?.risk_level || 'UNKNOWN';
+                            const riskClass = riskLevel.toLowerCase();
+                            const eventType = threat.log_data?.event_type || 'unknown';
                             return `
                                 <div class="d-flex align-items-center mb-2 p-2 rounded" style="background: rgba(30, 41, 59, 0.5);">
                                     <div class="me-2">
                                         <i class="fas fa-${riskClass === 'high' ? 'skull-crossbones' : riskClass === 'medium' ? 'exclamation-triangle' : 'info-circle'} ${riskClass === 'high' ? 'text-danger' : riskClass === 'medium' ? 'text-warning' : 'text-info'}"></i>
                                     </div>
                                     <div class="flex-grow-1 small">
-                                        <div class="fw-bold">${threat.log_data.event_type}</div>
-                                        <div class="text-secondary">${threat.result.risk_level} Risk</div>
+                                        <div class="fw-bold">${eventType}</div>
+                                        <div class="text-secondary">${riskLevel} Risk</div>
                                     </div>
                                     <div class="small text-muted">${new Date(threat.timestamp).toLocaleTimeString()}</div>
                                 </div>
@@ -1842,12 +1867,20 @@ def home():
                     
                     // Update user profiles
                     const userContainer = document.getElementById('userProfiles');
+                    console.log('User profiles - Container found:', userContainer !== null);
+                    console.log('User profiles - Profiles object:', profiles);
+                    console.log('User profiles - Object.keys:', Object.keys(profiles));
+                    
                     const profileArray = Object.values(profiles);
+                    console.log('User profiles - Array length:', profileArray.length);
+                    console.log('User profiles - First profile:', profileArray[0]);
                     
                     if (profileArray.length === 0) {
                         userContainer.innerHTML = '<div class="text-center py-3"><i class="fas fa-users fa-2x text-warning mb-2"></i><p class="text-secondary">No active users</p></div>';
                     } else {
-                        const html = profileArray.slice(0, 3).map(user => `
+                        const html = profileArray.slice(0, 3).map(user => {
+                            console.log('Processing user:', user);
+                            return `
                             <div class="d-flex align-items-center mb-2 p-2 rounded" style="background: rgba(30, 41, 59, 0.5);">
                                 <div class="me-2">
                                     <i class="fas fa-user"></i>
@@ -1860,7 +1893,9 @@ def home():
                                     ${user.current_risk_score > 0.75 ? 'High' : user.current_risk_score > 0.5 ? 'Medium' : 'Low'}
                                 </div>
                             </div>
-                        `).join('');
+                        `;
+                        }).join('');
+                        console.log('User profiles HTML:', html);
                         userContainer.innerHTML = html;
                     }
                     
@@ -1868,10 +1903,16 @@ def home():
                     const ipContainer = document.getElementById('suspiciousIps');
                     const ipArray = Object.values(ips);
                     
+                    console.log('Suspicious IPs - Container found:', ipContainer !== null);
+                    console.log('Suspicious IPs - Array length:', ipArray.length);
+                    console.log('Suspicious IPs - First IP:', ipArray[0]);
+                    
                     if (ipArray.length === 0) {
                         ipContainer.innerHTML = '<div class="text-center py-3"><i class="fas fa-globe fa-2x text-warning mb-2"></i><p class="text-secondary">No suspicious IPs</p></div>';
                     } else {
-                        const html = ipArray.slice(0, 3).map(ip => `
+                        const html = ipArray.slice(0, 3).map(ip => {
+                            console.log('Processing IP:', ip);
+                            return `
                             <div class="d-flex align-items-center mb-2 p-2 rounded" style="background: rgba(30, 41, 59, 0.5);">
                                 <div class="me-2">
                                     <i class="fas fa-${ip.is_blocked ? 'ban' : 'exclamation-triangle'} ${ip.is_blocked ? 'text-danger' : 'text-warning'}"></i>
@@ -1882,18 +1923,70 @@ def home():
                                 </div>
                                 <div class="small text-muted">${ip.is_blocked ? 'Blocked' : 'Active'}</div>
                             </div>
-                        `).join('');
+                        `;
+                        }).join('');
+                        console.log('Suspicious IPs HTML:', html);
                         ipContainer.innerHTML = html;
                     }
                 })
                 .catch(error => {
                     console.error('Error loading dashboard data:', error);
+                    console.error('Error stack:', error.stack);
+                    // Show error in the UI
+                    const userContainer = document.getElementById('userProfiles');
+                    const ipContainer = document.getElementById('suspiciousIps');
+                    const recentContainer = document.getElementById('recentThreats');
+                    
+                    if (userContainer) {
+                        userContainer.innerHTML = '<div class="text-center py-3"><i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i><p class="text-danger">Error loading user profiles</p></div>';
+                    }
+                    if (ipContainer) {
+                        ipContainer.innerHTML = '<div class="text-center py-3"><i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i><p class="text-danger">Error loading suspicious IPs</p></div>';
+                    }
+                    if (recentContainer) {
+                        recentContainer.innerHTML = '<div class="text-center py-3"><i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i><p class="text-danger">Error loading recent threats</p></div>';
+                    }
+                })
+                .finally(() => {
+                    console.log('Dashboard data loading completed');
                 });
         }
         
         // Auto-refresh every 30 seconds
-        loadDashboardData();
+        console.log('Starting dashboard initialization...');
+        
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM loaded, calling loadDashboardData');
+                loadDashboardData();
+            });
+        } else {
+            console.log('DOM already loaded, calling loadDashboardData immediately');
+            loadDashboardData();
+        }
+        
         setInterval(loadDashboardData, 30000);
+        
+        // Manual refresh function for testing
+        window.refreshDashboard = function() {
+            console.log('Manual dashboard refresh triggered');
+            loadDashboardData();
+        };
+        
+        // Test function to check if DOM elements exist
+        window.testDashboardElements = function() {
+            console.log('Testing dashboard elements:');
+            console.log('userProfiles element:', document.getElementById('userProfiles'));
+            console.log('suspiciousIps element:', document.getElementById('suspiciousIps'));
+            console.log('recentThreats element:', document.getElementById('recentThreats'));
+        };
+        
+        // Call test function after a short delay
+        setTimeout(function() {
+            console.log('Running delayed element test...');
+            window.testDashboardElements();
+        }, 2000);
     </script>
 </body>
 </html>
@@ -2007,29 +2100,29 @@ def health():
         h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, select, textarea, label, strong, em, .card, .card-header, .card-body, .metric-card, .badge, .btn {
             font-family: inherit !important;
             color: #f8fafc !important; /* Ensure text is visible on dark background */
-        }}
+        }
         
         /* Bootstrap component overrides */
         .btn, .form-control, .form-select, .navbar, .navbar-brand, .nav-link {
             font-family: inherit !important;
             color: #f8fafc !important; /* Ensure text is visible on dark background */
-        }}
+        }
         
         /* Ensure text elements have proper contrast */
         .text-muted {
             color: #94a3b8 !important; /* Light gray for muted text */
-        }}
+        }
         
         .text-secondary {
             color: #cbd5e1 !important; /* Medium gray for secondary text */
-        }}
+        }
         
         .card {
             background: rgba(30, 41, 59, 0.8);
             border: 1px solid #334155;
             border-radius: 15px;
             color: #f8fafc !important; /* Ensure card text is visible */
-        }}
+        }
         
         .metric-card {
             background: rgba(30, 41, 59, 0.8);
@@ -2038,104 +2131,104 @@ def health():
             padding: 1rem;
             text-align: center;
             color: #f8fafc !important; /* Ensure metric card text is visible */
-        }}
+        }
         
         .metric-card .metric-value {
             font-size: 2rem;
             font-weight: 700;
             color: #f8fafc !important; /* Ensure metric values are visible */
-        }}
+        }
         
         .metric-card .metric-label {
             font-size: 1rem;
             color: #94a3b8 !important; /* Light gray for labels */
-        }}
+        }
         
         .chart-container {
             width: 100%;
             height: 400px;
-        }}
+        }
         
         .chart-container canvas {
             width: 100%;
             height: 100%;
-        }}
+        }
         
         /* Stat card styling */
         .stat-card h3 {
             color: #f8fafc !important; /* Ensure stat card headings are visible */
-        }}
+        }
         
         .stat-card p {
             color: #94a3b8 !important; /* Light gray for stat card text */
-        }}
+        }
         
         /* Risk level styling */
         .risk-high {
             color: #ef4444 !important; /* Red for high risk */
-        }}
+        }
         
         .risk-medium {
             color: #f59e0b !important; /* Yellow for medium risk */
-        }}
+        }
         
         .risk-low {
             color: #06b6d4 !important; /* Cyan for low risk */
-        }}
+        }
         
         /* Table and row styling */
         .row {
             color: #f8fafc !important; /* Ensure row text is visible */
-        }}
+        }
         
         .col-6 strong {
             color: #f8fafc !important; /* Ensure strong text is visible */
-        }}
+        }
         
         .col-6 {
             color: #cbd5e1 !important; /* Medium gray for regular text */
-        }}
+        }
         
         /* Additional text visibility enhancements */
         .card-header {
             color: #f8fafc !important;
             background: rgba(30, 41, 59, 0.9) !important;
-        }}
+        }
         
         .card-header h2, .card-header h3, .card-header h4, .card-header h5 {
             color: #f8fafc !important;
-        }}
+        }
         
         .card-body {
             color: #f8fafc !important;
-        }}
+        }
         
         .card-body h5 {
             color: #f8fafc !important;
-        }}
+        }
         
         .btn-primary {
             color: #ffffff !important;
             background-color: #3b82f6 !important;
             border-color: #3b82f6 !important;
-        }}
+        }
         
         .btn-success {
             color: #ffffff !important;
             background-color: #10b981 !important;
             border-color: #10b981 !important;
-        }}
+        }
         
         .btn-secondary {
             color: #ffffff !important;
             background-color: #64748b !important;
             border-color: #64748b !important;
-        }}
+        }
         
         /* Ensure all text elements in charts have proper contrast */
         .chartjs-render-monitor {
             color: #f8fafc !important;
-        }}
+        }
         
         /* Fix for text inside chart legends */
         .chart-legend {
@@ -3076,7 +3169,7 @@ def analyze_batch():
         
         for log in logs:
             # Use the existing threat detector
-            analysis = detector.analyze_log(log)
+            analysis = detector.analyze(log)
             results.append({
                 'log_id': log.get('id', len(results)),
                 'threat_detected': analysis.get('threat_detected', False),
@@ -3160,157 +3253,14 @@ def model_metrics():
             'timestamp': datetime.utcnow().isoformat()
         }), 500
 
-def generate_sample_data():
-    """Generate enhanced sample data with NSL-KDD inspired attack scenarios"""
-    sample_logs = [
-        # Normal activity
-        {
-            'ip_address': '192.168.1.100',
-            'user_id': 'alice.johnson',
-            'event_type': 'login',
-            'failed_login_attempts': 0,
-            'bytes_transferred': 1024,
-            'connection_rate': 1
-        },
-        # R2L attack (brute force)
-        {
-            'ip_address': '198.51.100.30',
-            'user_id': 'charlie.brown',
-            'event_type': 'brute_force',
-            'failed_login_attempts': 8,
-            'bytes_transferred': 512,
-            'dictionary_attack': True
-        },
-        # DoS attack
-        {
-            'ip_address': '185.220.101.5',
-            'user_id': 'unknown',
-            'event_type': 'ddos',
-            'failed_login_attempts': 25,
-            'bytes_transferred': 75000000,
-            'connection_rate': 150
-        },
-        # Probe attack
-        {
-            'ip_address': '91.240.118.172',
-            'user_id': 'scanner_bot',
-            'event_type': 'port_scan',
-            'failed_login_attempts': 0,
-            'bytes_transferred': 2048,
-            'unique_ports_accessed': 50,
-            'scan_duration': 300
-        },
-        # U2R attack
-        {
-            'ip_address': '104.244.76.187',
-            'user_id': 'compromised_user',
-            'event_type': 'buffer_overflow',
-            'failed_login_attempts': 1,
-            'bytes_transferred': 4096,
-            'privilege_escalation': True,
-            'root_access_attempt': True
-        },
-        # Behavioral anomaly
-        {
-            'ip_address': '203.0.113.45',
-            'user_id': 'night_worker',
-            'event_type': 'login',
-            'failed_login_attempts': 0,
-            'bytes_transferred': 512000,
-            'geographic_distance': 8000,
-            'session_duration': 7200
-        },
-        # Unknown threat simulation
-        {
-            'ip_address': '203.0.113.199',
-            'user_id': 'unknown_actor',
-            'event_type': 'unknown_attack',
-            'failed_login_attempts': 0,
-            'bytes_transferred': 150000000,
-            'protocol_violation': True,
-            'encrypted_suspicious_traffic': True,
-            'unknown_user_agent': True,
-            'error_rate': 0.7
-        }
-    ]
-    
-    for log in sample_logs:
-        log['timestamp'] = datetime.utcnow().isoformat()
-        result = detector.analyze(log)
-        
-        # Store the threat data
-        threat_entry = {
-            'log_data': log,
-            'result': result,
-            'timestamp': datetime.utcnow()
-        }
-        threat_data.append(threat_entry)
-        
-        # Manually create user profiles since enhanced detector doesn't handle them
-        user_id = log.get('user_id', '')
-        if user_id:
-            if user_id not in user_profiles:
-                user_profiles[user_id] = {
-                    'user_id': user_id,
-                    'current_risk_score': 0.5,
-                    'total_alerts': 0,
-                    'high_risk_alerts': 0,
-                    'medium_risk_alerts': 0,
-                    'last_suspicious_activity': None,
-                    'created_at': datetime.utcnow().isoformat()
-                }
-            
-            profile = user_profiles[user_id]
-            profile['current_risk_score'] = result['risk_score']
-            profile['updated_at'] = datetime.utcnow().isoformat()
-            
-            if result['risk_level'] != 'NORMAL':
-                profile['total_alerts'] += 1
-                profile['last_suspicious_activity'] = datetime.utcnow().isoformat()
-                
-                if result['risk_level'] == 'HIGH':
-                    profile['high_risk_alerts'] += 1
-                elif result['risk_level'] == 'MEDIUM':
-                    profile['medium_risk_alerts'] += 1
-        
-        # Manually create suspicious IPs since enhanced detector doesn't handle them
-        source_ip = log.get('ip_address', '')
-        if source_ip and result['risk_level'] != 'NORMAL':
-            if source_ip not in suspicious_ips:
-                suspicious_ips[source_ip] = {
-                    'ip_address': source_ip,
-                    'threat_count': 0,
-                    'risk_score': 0.0,
-                    'last_seen': None,
-                    'threat_types': [],
-                    'first_detected': datetime.utcnow().isoformat(),
-                    'country': 'Unknown',
-                    'is_blocked': False
-                }
-            
-            ip_profile = suspicious_ips[source_ip]
-            ip_profile['threat_count'] += 1
-            ip_profile['risk_score'] = max(ip_profile['risk_score'], result['risk_score'])
-            ip_profile['last_seen'] = datetime.utcnow().isoformat()
-            
-            # Add threat type if not already present
-            threat_category = result.get('threat_category', 'Unknown')
-            if threat_category not in ip_profile['threat_types']:
-                ip_profile['threat_types'].append(threat_category)
-            
-            # Block high-risk IPs
-            if result['risk_level'] == 'HIGH':
-                ip_profile['is_blocked'] = True
-        
-        logger.info(f"Sample analysis: {log['event_type']} -> {result['risk_level']} ({result['threat_category']})")
-    
-    logger.info("Generated enhanced sample threat data with dataset-inspired scenarios")
 
+    
+    
 if __name__ == '__main__':
     logger.info("🛡️ Starting ThreatX Test Server...")
     
-    # Generate some sample data
-    generate_sample_data()
+    
+   
     
     print("=" * 70)
     print("🛡️  ThreatX AI-Powered Threat Detector - Enhanced Test Server")

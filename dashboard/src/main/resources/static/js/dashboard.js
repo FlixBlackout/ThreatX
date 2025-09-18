@@ -227,9 +227,22 @@ function showNotification(message, type = 'info') {
 
 // Load dashboard data with simple refresh mechanism
 function loadDashboardData(retryCount = 0) {
-    console.log('Dashboard data refresh requested - relying on server-side rendering');
-    // Note: Removed automatic page reload to prevent auto-scrolling
-    // The dashboard data is already loaded via server-side rendering
+    console.log('Loading dashboard data...');
+    
+    // Load all dashboard data components
+    Promise.all([
+        loadThreatStatistics(),
+        loadSuspiciousIPs(),
+        loadRecentThreats()
+    ])
+    .then(() => {
+        console.log('Dashboard data loaded successfully');
+        showNotification('Dashboard data refreshed', 'success');
+    })
+    .catch(error => {
+        console.error('Error loading dashboard data:', error);
+        showNotification('Failed to refresh dashboard data', 'warning');
+    });
 }
 
 // Load threat statistics
